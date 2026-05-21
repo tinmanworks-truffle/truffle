@@ -1,0 +1,35 @@
+add_library(truffle_core STATIC core/core.cpp)
+target_include_directories(truffle_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_compile_features(truffle_core PUBLIC cxx_std_20)
+add_library(Truffle::Core ALIAS truffle_core)
+
+add_library(truffle_ecs STATIC ecs/world.cpp)
+target_include_directories(truffle_ecs PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(truffle_ecs PUBLIC truffle_core)
+target_compile_features(truffle_ecs PUBLIC cxx_std_20)
+add_library(Truffle::ECS ALIAS truffle_ecs)
+
+add_library(truffle_rhi STATIC rhi/rhi.cpp)
+target_include_directories(truffle_rhi PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(truffle_rhi PUBLIC truffle_core)
+target_compile_features(truffle_rhi PUBLIC cxx_std_20)
+add_library(Truffle::RHI ALIAS truffle_rhi)
+
+add_library(truffle_backend_null STATIC rhi/null_backend.cpp)
+target_include_directories(truffle_backend_null PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(truffle_backend_null PUBLIC truffle_rhi)
+target_compile_features(truffle_backend_null PUBLIC cxx_std_20)
+add_library(Truffle::BackendNull ALIAS truffle_backend_null)
+
+add_library(truffle_render STATIC render/renderer.cpp)
+target_include_directories(truffle_render PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(truffle_render PUBLIC truffle_ecs truffle_rhi)
+target_compile_features(truffle_render PUBLIC cxx_std_20)
+add_library(Truffle::Render ALIAS truffle_render)
+
+add_library(truffle_window STATIC window/window.cpp)
+target_include_directories(truffle_window PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(truffle_window PUBLIC truffle_core truffle_rhi)
+target_compile_features(truffle_window PUBLIC cxx_std_20)
+add_library(Truffle::Window ALIAS truffle_window)
+
