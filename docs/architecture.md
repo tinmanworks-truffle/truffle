@@ -14,9 +14,9 @@
 ## Repository Shape
 
 Public contracts stay under `include/truffle`. Runtime implementations stay
-under `src`. The first workspace uses focused examples and tests as proof of the
-host-owned surface path, the optional window-facing path, ECS queries, and RHI
-submission flow.
+under `src`. The first workspace uses finite consumer examples and tests as
+proof of the host-owned surface path, the optional window-facing path, ECS
+queries, resource setup, swapchain resize, and RHI submission flow.
 
 ## Data Flow
 
@@ -29,4 +29,6 @@ OpenGL, or Metal without changing higher-level ECS ownership.
 
 The repository starts with contracts, a null backend, examples, and tests. The
 null backend validates resource creation, command recording, surface/swapchain
-flow, and submission flow without requiring a GPU or native window.
+flow, and submission flow without requiring a GPU or native window. The richer
+example apps keep application loops outside Truffle while simulating mixed
+viewport, simulation, and game-like render usage.
