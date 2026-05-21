@@ -1,0 +1,66 @@
+# Contributing
+
+Truffle follows TinMan engineering doctrine for public authorship, branch
+workflow, commit messages, and signed repository history.
+
+## Branching Strategy
+
+- `master` is the stable integration branch.
+- Use `feat/<topic>` for new work.
+- Use `fix/<topic>` for corrections.
+- Open pull requests into `master`; do not use direct pushes for normal work.
+
+## Pull Requests
+
+- Keep changes focused and prefer small reviewable pull requests.
+- Update docs when public contracts, architecture, or workflow behavior changes.
+- Run the relevant build and test checks before requesting merge.
+- Merge only signed commits into protected branches.
+
+## Commit Message Format
+
+Use Doctrine commit format:
+
+- `<type>(<scope>): <summary>`
+- `(<scope>)` is optional.
+
+Allowed `type` values:
+
+- `feat`
+- `fix`
+- `docs`
+- `chore`
+- `refactor`
+- `test`
+- `ci`
+- `build`
+- `perf`
+- `revert`
+
+Rules:
+
+- Use imperative mood.
+- Keep subjects concise and prefer 72 characters or fewer.
+- Do not end the subject with a period.
+- For breaking changes, use `!` and include `BREAKING CHANGE:` in the body.
+
+Examples:
+
+- `feat(rhi): add buffer mapping contract`
+- `fix(ecs): reject stale entity mutation`
+- `docs(workflow): clarify protected branch rules`
+
+## Public Identity And Signing
+
+- Public Truffle authorship should use `TinMan` unless a legal or personal
+  context explicitly requires another identity.
+- Protected branch commits must be signed.
+- Configure Git signing before pushing a branch intended for merge.
+
+## Code Quality
+
+- Follow `.editorconfig`.
+- Keep module boundaries explicit and public contracts documented.
+- Keep the default CMake build path reproducible and optional tooling
+  non-blocking.
+
