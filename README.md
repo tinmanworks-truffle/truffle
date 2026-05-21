@@ -62,3 +62,8 @@ the optional window target and use its surface-facing helper contracts.
 - `tests/` contract tests
 - `examples/` embedding proofs
 - `docs/` charter, architecture, and backend roadmap
+
+## Contributing
+
+See `CONTRIBUTING.md` for the branch workflow, commit format, signing
+expectations, and pull request path into protected `master`.
