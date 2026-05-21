@@ -5,14 +5,19 @@ workflow, commit messages, and signed repository history.
 
 ## Branching Strategy
 
-- `master` is the stable integration branch.
+- `master` is the stable branch for established Truffle baselines.
+- `develop` is the active integration branch.
 - Use `feat/<topic>` for new work.
 - Use `fix/<topic>` for corrections.
-- Open pull requests into `master`; do not use direct pushes for normal work.
+- Open normal feature and fix pull requests into `develop`.
+- Merge `develop` into `master` only when the integrated code is stable enough
+  to become the next established baseline.
+- Do not use direct pushes for normal work on protected branches.
 
 ## Pull Requests
 
 - Keep changes focused and prefer small reviewable pull requests.
+- Target `develop` unless the pull request is a stable promotion into `master`.
 - Update docs when public contracts, architecture, or workflow behavior changes.
 - Run the relevant build and test checks before requesting merge.
 - Merge only signed commits into protected branches.

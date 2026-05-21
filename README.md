@@ -66,4 +66,5 @@ the optional window target and use its surface-facing helper contracts.
 ## Contributing
 
 See `CONTRIBUTING.md` for the branch workflow, commit format, signing
-expectations, and pull request path into protected `master`.
+expectations, pull request path into protected `develop`, and stable promotion
+path into `master`.
