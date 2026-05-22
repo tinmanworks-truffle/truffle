@@ -39,6 +39,11 @@ enum class BufferUsage {
     transfer_destination,
 };
 
+enum class IndexFormat {
+    uint16,
+    uint32,
+};
+
 enum class TextureFormat {
     rgba8_unorm,
     bgra8_unorm,
@@ -279,7 +284,8 @@ public:
         std::uint32_t binding, IBuffer& buffer,
         std::size_t offset = 0) = 0;
     [[nodiscard]] virtual core::Status bind_index_buffer(
-        IBuffer& buffer, std::size_t offset = 0) = 0;
+        IBuffer& buffer, std::size_t offset = 0,
+        IndexFormat format = IndexFormat::uint32) = 0;
     // Bind a uniform/constant buffer to both vertex and fragment stages.
     [[nodiscard]] virtual core::Status bind_uniform_buffer(
         std::uint32_t binding, IBuffer& buffer,
@@ -296,6 +302,11 @@ public:
         std::uint32_t vertex_count) = 0;
     [[nodiscard]] virtual core::Status draw_instanced(
         std::uint32_t vertex_count,
+        std::uint32_t instance_count) = 0;
+    [[nodiscard]] virtual core::Status draw_indexed(
+        std::uint32_t index_count) = 0;
+    [[nodiscard]] virtual core::Status draw_indexed_instanced(
+        std::uint32_t index_count,
         std::uint32_t instance_count) = 0;
 };
 

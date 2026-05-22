@@ -69,11 +69,35 @@ int main() {
                       .ok());
     TRUFFLE_CHECK(fence->signaled());
 
+    // --- Indexed draw ---
+    auto ibResult = device->create_buffer({
+        .size = 128,
+        .usage = truffle::rhi::BufferUsage::index,
+        .debugName = "ib",
+    });
+    TRUFFLE_CHECK(ibResult.ok());
+    auto ib = std::move(ibResult).value();
+
+    auto cmdIdx = device->create_command_buffer();
+    TRUFFLE_CHECK(cmdIdx->begin().ok());
+    truffle::rhi::RenderPassDesc passIdx;
+    passIdx.extent = {640, 480};
+    TRUFFLE_CHECK(cmdIdx->begin_render_pass(passIdx).ok());
+    TRUFFLE_CHECK(cmdIdx->bind_index_buffer(*ib, 0,
+        truffle::rhi::IndexFormat::uint16).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed(6).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed_instanced(6, 2).ok());
+    TRUFFLE_CHECK(cmdIdx->end_render_pass().ok());
+    TRUFFLE_CHECK(cmdIdx->end().ok());
+    TRUFFLE_CHECK(device->queue(truffle::rhi::QueueKind::graphics)
+                      .submit(*cmdIdx)
+                      .ok());
+
     const auto stats = backend->stats();
-    TRUFFLE_CHECK(stats.buffersCreated == 2); // original vb + new vb
+    TRUFFLE_CHECK(stats.buffersCreated == 3); // original vb + new vb + ib
     TRUFFLE_CHECK(stats.surfacesCreated == 1);
     TRUFFLE_CHECK(stats.swapchainsCreated == 1);
-    TRUFFLE_CHECK(stats.drawsRecorded == 1);
-    TRUFFLE_CHECK(stats.submissions == 1);
+    TRUFFLE_CHECK(stats.drawsRecorded == 3); // draw + draw_indexed + draw_indexed_instanced
+    TRUFFLE_CHECK(stats.submissions == 2);
     return 0;
 }

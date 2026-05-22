@@ -112,10 +112,22 @@ core::Status Renderer::render(std::span<const RenderBatch> batches,
                 batch.uniformBuffer.offset);
         }
 
-        if (const auto s =
-                cmd->draw_instanced(batch.vertexCount, batch.instanceCount);
-            !s.ok()) {
-            return s;
+        if (batch.kind == DrawKind::Indexed && batch.indexBuffer.buffer) {
+            (void)cmd->bind_index_buffer(*batch.indexBuffer.buffer,
+                                          batch.indexBuffer.offset,
+                                          batch.indexFormat);
+            if (const auto s =
+                    cmd->draw_indexed_instanced(batch.vertexCount,
+                                                batch.instanceCount);
+                !s.ok()) {
+                return s;
+            }
+        } else {
+            if (const auto s =
+                    cmd->draw_instanced(batch.vertexCount, batch.instanceCount);
+                !s.ok()) {
+                return s;
+            }
         }
     }
 
