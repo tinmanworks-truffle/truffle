@@ -176,5 +176,35 @@ int main() {
     // --- Swapchain resize ---
     TRUFFLE_CHECK(swapchain->resize({640, 480}).ok());
 
+    // --- Indexed draw ---
+    auto ibResult = device->create_buffer({
+        .size      = 64,
+        .usage     = truffle::rhi::BufferUsage::index,
+        .debugName = "index_buffer",
+    });
+    TRUFFLE_CHECK(ibResult.ok());
+    auto ib = std::move(ibResult).value();
+
+    auto* drawable3 = swapchain->acquire_next_texture();
+    TRUFFLE_CHECK(drawable3 != nullptr);
+
+    auto cmdIdx = device->create_command_buffer();
+    TRUFFLE_CHECK(cmdIdx->begin().ok());
+    truffle::rhi::RenderPassDesc passIdx;
+    passIdx.extent                  = {640, 480};
+    passIdx.colorAttachment.texture = drawable3;
+    TRUFFLE_CHECK(cmdIdx->begin_render_pass(passIdx).ok());
+    TRUFFLE_CHECK(cmdIdx->bind_pipeline(*pipeline).ok());
+    TRUFFLE_CHECK(cmdIdx->bind_index_buffer(*ib, 0,
+        truffle::rhi::IndexFormat::uint32).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed(3).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed_instanced(3, 2).ok());
+    TRUFFLE_CHECK(cmdIdx->end_render_pass().ok());
+    TRUFFLE_CHECK(swapchain->schedule_present(*cmdIdx).ok());
+    TRUFFLE_CHECK(cmdIdx->end().ok());
+    TRUFFLE_CHECK(device->queue(truffle::rhi::QueueKind::graphics)
+                      .submit(*cmdIdx)
+                      .ok());
+
     return 0;
 }

@@ -102,8 +102,9 @@ struct RenderBatch {
     std::uint32_t  instanceCount = 0;
     std::uint32_t  vertexCount   = 3;
     BufferView     bindings[kMaxBindings]{};
-    DrawKind       kind     = DrawKind::Direct;
-    MaterialId     material = 0;
+    DrawKind       kind        = DrawKind::Direct;
+    MaterialId     material    = 0;
+    rhi::IndexFormat indexFormat = rhi::IndexFormat::uint32; // for DrawKind::Indexed
 
     // Optional: index buffer for DrawKind::Indexed
     BufferView indexBuffer;

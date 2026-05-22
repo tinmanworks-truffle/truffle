@@ -149,7 +149,8 @@ public:
     }
 
     [[nodiscard]] Status bind_index_buffer(IBuffer& /*buffer*/,
-                                            std::size_t /*offset*/) override {
+                                            std::size_t /*offset*/,
+                                            IndexFormat /*format*/) override {
         if (state_ != State::recording) {
             return Status::failure(StatusCode::invalid_state,
                                    "bind_index_buffer requires recording");
@@ -202,6 +203,20 @@ public:
         if (state_ != State::recording || vertex_count == 0 || instance_count == 0) {
             return Status::failure(StatusCode::invalid_state,
                                    "draw_instanced requires a recording command buffer");
+        }
+        ++stats_->value.drawsRecorded;
+        return Status::success();
+    }
+
+    [[nodiscard]] Status draw_indexed(std::uint32_t index_count) override {
+        return draw_indexed_instanced(index_count, 1);
+    }
+
+    [[nodiscard]] Status draw_indexed_instanced(std::uint32_t index_count,
+                                                std::uint32_t instance_count) override {
+        if (state_ != State::recording || index_count == 0 || instance_count == 0) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_instanced requires a recording command buffer");
         }
         ++stats_->value.drawsRecorded;
         return Status::success();

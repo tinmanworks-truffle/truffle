@@ -13,9 +13,9 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Phases 3A–3E complete and merged to `develop` (PR #9). `develop` is now at
-`be4810f`. No open feature branches. Next planned work is Phase 4 (shader
-variant pipeline, GPU-resident batch path, or additional backend targets).
+Indexed draw (Phase 3F) implemented and committed on `feat/indexed-draw`, pending
+PR merge to `develop`. After merge, next planned work is Phase 4 (shader variant
+pipeline, GPU-resident batch path, or additional backend targets).
 
 ## Current Work Status
 
@@ -37,6 +37,20 @@ variant pipeline, GPU-resident batch path, or additional backend targets).
   - `application.cpp` — `run_interactive_metal()` uses Metal backend with real
     MSL shaders, `cocoa_layer` surface, and `PipelineCache`; activated by `--metal`.
   - CMakeLists.txt conditionally compiles `.mm` and links `truffle_backend_metal`.
+- **Phase 3F — Indexed draw** (on `feat/indexed-draw`, pending merge):
+  - `rhi.hpp`: `IndexFormat` enum (uint16/uint32); `bind_index_buffer` takes
+    `IndexFormat`; `ICommandBuffer` gains `draw_indexed` and
+    `draw_indexed_instanced`.
+  - `render_batch.hpp`: `indexFormat` field added to `RenderBatch`.
+  - `metal_backend.mm`: `to_mtl_index_type` helper; `bind_index_buffer` stores
+    `id<MTLBuffer>`, offset, and `MTLIndexType`; `draw_indexed_instanced` calls
+    `drawIndexedPrimitives:`.
+  - `null_backend.cpp`: updated signatures; `draw_indexed_instanced` increments
+    `drawsRecorded`.
+  - `renderer.cpp`: routes `DrawKind::Indexed` batches through
+    `bind_index_buffer` + `draw_indexed_instanced`.
+  - Tests: `rhi_null_tests.cpp` and `metal_backend_tests.cpp` extended with
+    indexed draw coverage.
 
 ## Relevant Decisions And Constraints
 
@@ -74,24 +88,24 @@ variant pipeline, GPU-resident batch path, or additional backend targets).
 
 ## Last Verified Commands And Checks
 
-Verified on 2025-05-22 (Phase 3C/D/E, PR #9):
+Verified on 2025-05-22 (Phase 3F indexed draw, `feat/indexed-draw`):
 
 ```sh
 cmake --preset dev  -DTRUFFLE_BUILD_BACKEND_METAL=ON
 cmake --build --preset dev
 ctest --preset dev   # 11/11
 cmake --preset ci   -DTRUFFLE_BUILD_BACKEND_METAL=ON
-cmake --build --preset ci
-ctest --preset ci    # 11/11
+cmake --build --preset ci  # warnings-as-errors clean
 ```
 
-11 tests: 3 host workspace smoke, ECS, null RHI, render flow, render batch,
-frame ring, scene adapter, Metal backend, package consumer.
+11 tests: 3 host workspace smoke, ECS, null RHI (+ indexed draw), render flow,
+render batch, frame ring, scene adapter, Metal backend (+ indexed draw),
+package consumer.
 
 ## Next Resume Steps
 
 1. Read `AGENTS.md`, README, contributor guidance, and architecture docs.
-2. Confirm `develop` is at `be4810f` and all tests pass.
+2. Confirm `feat/indexed-draw` PR is merged; verify `develop` has Phase 3F.
 3. Phase 4 candidates:
    - Shader variant pipeline (hot-reload, permutation keys).
    - GPU-resident batch path (indirect draw with GPU-side buffer management).

@@ -60,6 +60,13 @@ static MTLPrimitiveType to_mtl_primitive(PrimitiveTopology topo) noexcept {
     }
 }
 
+static MTLIndexType to_mtl_index_type(IndexFormat fmt) noexcept {
+    switch (fmt) {
+        case IndexFormat::uint16: return MTLIndexTypeUInt16;
+        case IndexFormat::uint32: return MTLIndexTypeUInt32;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
@@ -335,12 +342,16 @@ public:
         return Status::success();
     }
 
-    Status bind_index_buffer(IBuffer& /*buffer*/, std::size_t /*offset*/) override {
+    Status bind_index_buffer(IBuffer& buffer, std::size_t offset,
+                               IndexFormat format) override {
         if (!encoder_) {
             return Status::failure(StatusCode::invalid_state,
                                    "bind_index_buffer requires an active render pass");
         }
-        return Status::success(); // TODO: store for indexed draws
+        indexBuf_       = static_cast<MetalBuffer&>(buffer).native();
+        indexBufOffset_ = offset;
+        indexBufType_   = to_mtl_index_type(format);
+        return Status::success();
     }
 
     Status bind_uniform_buffer(std::uint32_t binding,
@@ -400,6 +411,29 @@ public:
         return Status::success();
     }
 
+    Status draw_indexed(std::uint32_t index_count) override {
+        return draw_indexed_instanced(index_count, 1);
+    }
+
+    Status draw_indexed_instanced(std::uint32_t index_count,
+                                   std::uint32_t instance_count) override {
+        if (!encoder_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_instanced requires an active render pass");
+        }
+        if (!indexBuf_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_instanced requires a bound index buffer");
+        }
+        [encoder_ drawIndexedPrimitives:to_mtl_primitive(topology_)
+                             indexCount:index_count
+                              indexType:indexBufType_
+                            indexBuffer:indexBuf_
+                      indexBufferOffset:indexBufOffset_
+                          instanceCount:instance_count];
+        return Status::success();
+    }
+
     Status end() override {
         if (state_ != State::recording) {
             return Status::failure(StatusCode::invalid_state,
@@ -427,11 +461,14 @@ public:
 private:
     enum class State { initial, recording, ready };
 
-    id<MTLCommandQueue>         queue_    = nil;
-    id<MTLCommandBuffer>        cmdBuf_   = nil;
-    id<MTLRenderCommandEncoder> encoder_  = nil;
-    State                       state_    = State::initial;
-    PrimitiveTopology           topology_ = PrimitiveTopology::triangle_list;
+    id<MTLCommandQueue>         queue_          = nil;
+    id<MTLCommandBuffer>        cmdBuf_         = nil;
+    id<MTLRenderCommandEncoder> encoder_        = nil;
+    State                       state_          = State::initial;
+    PrimitiveTopology           topology_       = PrimitiveTopology::triangle_list;
+    id<MTLBuffer>               indexBuf_       = nil;
+    std::size_t                 indexBufOffset_ = 0;
+    MTLIndexType                indexBufType_   = MTLIndexTypeUInt32;
 };
 
 // ---------------------------------------------------------------------------
