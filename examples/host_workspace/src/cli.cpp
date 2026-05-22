@@ -34,6 +34,11 @@ CommandLineParse parse_command_line(int argc, char* argv[]) {
             continue;
         }
 
+        if (argument == "--metal") {
+            result.options.useMetal = true;
+            continue;
+        }
+
         if (argument == "--workspace") {
             if (index + 1 >= argc) {
                 return fail("--workspace requires a value");
@@ -56,6 +61,7 @@ CommandLineParse parse_command_line(int argc, char* argv[]) {
 
 void print_usage(std::ostream& output) {
     output << "Usage: truffle_host_workspace_example [--smoke] "
+              "[--metal] "
               "[--workspace editor|cad|simulation]\n";
 }
 

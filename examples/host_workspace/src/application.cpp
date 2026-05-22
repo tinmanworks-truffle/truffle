@@ -2,13 +2,19 @@
 
 #include "host_window.hpp"
 
+#include "truffle/render/pipeline_cache.hpp"
 #include "truffle/render/renderer.hpp"
 #include "truffle/rhi/null_backend.hpp"
 #include "truffle/scene/scene_adapter.hpp"
 
+#ifdef __APPLE__
+#include "truffle/rhi/metal_backend.hpp"
+#endif
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -296,6 +302,146 @@ void print_summary(std::string_view runKind, const IWorkspace& workspace,
     return 0;
 }
 
+#ifdef __APPLE__
+// ---------------------------------------------------------------------------
+// Minimal MSL shaders — fullscreen triangle, no vertex inputs
+// ---------------------------------------------------------------------------
+static const char kMSLVert[] = R"msl(
+#include <metal_stdlib>
+using namespace metal;
+vertex float4 vert_main(uint vid [[vertex_id]]) {
+    const float2 pos[3] = {{-1,-1},{3,-1},{-1,3}};
+    return float4(pos[vid % 3], 0.0, 1.0);
+}
+)msl";
+
+static const char kMSLFrag[] = R"msl(
+#include <metal_stdlib>
+using namespace metal;
+fragment float4 frag_main() {
+    return float4(0.2, 0.2, 0.4, 1.0);
+}
+)msl";
+
+[[nodiscard]] int run_interactive_metal(const IWorkspace& workspace) {
+    HostWindow window;
+    const auto title =
+        "Truffle Host Workspace [Metal] - " + std::string{workspace.name()};
+    if (const auto status = window.open(title, initialExtent); !status.ok()) {
+        return fail("open host window", status);
+    }
+
+    void* layerHandle = window.native_layer_handle();
+    if (!layerHandle) {
+        std::cerr << "native_layer_handle returned nullptr\n";
+        return 1;
+    }
+
+    auto backend = rhi::create_metal_backend();
+    if (backend->enumerate_adapters().empty()) {
+        std::cerr << "no Metal adapter available\n";
+        return 1;
+    }
+
+    auto deviceResult = backend->create_device({});
+    if (!deviceResult.ok()) {
+        return fail("create Metal device", deviceResult.status());
+    }
+    auto device = std::move(deviceResult).value();
+
+    auto toBytes = [](const char* src) {
+        const auto* p = reinterpret_cast<const std::byte*>(src);
+        return std::vector<std::byte>(p, p + std::strlen(src));
+    };
+
+    auto vertResult = device->create_shader({
+        .stage      = rhi::ShaderStage::vertex,
+        .entryPoint = "vert_main",
+        .bytecode   = toBytes(kMSLVert),
+    });
+    if (!vertResult.ok()) {
+        return fail("compile vertex shader", vertResult.status());
+    }
+    auto vertShader = std::move(vertResult).value();
+
+    auto fragResult = device->create_shader({
+        .stage      = rhi::ShaderStage::fragment,
+        .entryPoint = "frag_main",
+        .bytecode   = toBytes(kMSLFrag),
+    });
+    if (!fragResult.ok()) {
+        return fail("compile fragment shader", fragResult.status());
+    }
+    auto fragShader = std::move(fragResult).value();
+
+    auto surfaceResult = device->create_surface(SurfaceDesc{
+        .native        = {.kind   = NativeSurfaceKind::cocoa_layer,
+                          .handle = layerHandle},
+        .initialExtent = initialExtent,
+    });
+    if (!surfaceResult.ok()) {
+        return fail("create Metal surface", surfaceResult.status());
+    }
+    auto surface = std::move(surfaceResult).value();
+
+    auto extent = window.framebuffer_extent();
+    if (!non_zero(extent)) {
+        extent = initialExtent;
+    }
+
+    auto swapchainResult =
+        device->create_swapchain(*surface, SwapchainDesc{.extent = extent});
+    if (!swapchainResult.ok()) {
+        return fail("create Metal swapchain", swapchainResult.status());
+    }
+    auto swapchain = std::move(swapchainResult).value();
+
+    render::PipelineCache cache{*device};
+    cache.register_shaders(0, {vertShader.get(), fragShader.get()});
+    Renderer renderer{*device, &cache};
+
+    ecs::World world;
+    workspace.build_scene(world);
+    const auto systems = workspace.systems();
+
+    auto ringResult = device->create_upload_ring(2, 4 * 1024 * 1024);
+    if (!ringResult.ok()) {
+        return fail("create upload ring", ringResult.status());
+    }
+    auto ring = std::move(ringResult).value();
+
+    scene::SceneAdapter adapter;
+
+    while (!window.should_close()) {
+        window.poll_events();
+        if (window.should_close()) {
+            break;
+        }
+
+        const auto fb = window.framebuffer_extent();
+        if (non_zero(fb) && !same_extent(extent, fb)) {
+            if (const auto s = swapchain->resize(fb); !s.ok()) {
+                return fail("resize Metal swapchain", s);
+            }
+            extent = fb;
+        }
+
+        world.run(systems, fixedDeltaSeconds);
+        const auto frame = adapter.extract(world, *ring);
+        if (const auto s =
+                renderer.render(frame.meshBatches, swapchain.get());
+            !s.ok()) {
+            return fail("render Metal frame", s);
+        }
+        ring->advance();
+        std::this_thread::sleep_for(std::chrono::milliseconds{16});
+    }
+
+    std::cout << "host workspace metal interactive done\n";
+    return 0;
+}
+#endif // __APPLE__
+
 } // namespace
 
 int run_application(const ApplicationOptions& options) {
@@ -304,6 +450,11 @@ int run_application(const ApplicationOptions& options) {
         std::cerr << "workspace selection could not be created\n";
         return 1;
     }
+#ifdef __APPLE__
+    if (options.useMetal && !options.smoke) {
+        return run_interactive_metal(*workspace);
+    }
+#endif
     return options.smoke ? run_smoke(*workspace) : run_interactive(*workspace);
 }
 

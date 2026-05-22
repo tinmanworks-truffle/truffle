@@ -1,12 +1,13 @@
-// Metal backend — Phase 3B implementation
-// Phase 3B pragmatism notes (addressed in Phase 3C):
+// Metal backend — Phase 3B/3C/3D implementation
+// Phase 3C/3D notes:
+//   - Pipeline colour attachment pixel format driven by PipelineDesc::colorFormat.
+//   - Queue::submit() uses async MTLCommandBuffer completion handler + dispatch_semaphore.
 //   - All buffers use MTLResourceStorageModeShared (CPU+GPU visible).
-//   - Pipeline colour attachment pixel format is hardcoded to BGRA8Unorm.
-//   - Queue::submit() calls waitUntilCompleted when a fence is given (blocking).
 //   - No multi-threading safety beyond what Metal's own APIs guarantee.
 
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+#include <dispatch/dispatch.h>
 
 #include "truffle/rhi/metal_backend.hpp"
 
@@ -177,8 +178,7 @@ public:
         rpd.label           = [NSString stringWithUTF8String:desc.debugName.c_str()];
         rpd.vertexFunction  = static_cast<MetalShader*>(desc.vertexShader)->function();
         rpd.fragmentFunction = static_cast<MetalShader*>(desc.fragmentShader)->function();
-        // Phase 3B: colour attachment format hardcoded to BGRA8Unorm.
-        rpd.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        rpd.colorAttachments[0].pixelFormat = to_mtl_format(desc.colorFormat);
 
         NSError* err = nil;
         id<MTLRenderPipelineState> pso =
@@ -208,14 +208,38 @@ private:
 
 class MetalFence final : public IFence {
 public:
-    explicit MetalFence(bool signaled) : signaled_(signaled) {}
+    explicit MetalFence(bool initially_signaled)
+        : signaled_(std::make_shared<std::atomic<bool>>(initially_signaled))
+        , sem_(dispatch_semaphore_create(initially_signaled ? 1 : 0)) {}
+
+    ~MetalFence() { dispatch_release(sem_); }
+
     bool signaled() const noexcept override {
-        return signaled_.load(std::memory_order_acquire);
+        return signaled_->load(std::memory_order_acquire);
     }
-    void signal() noexcept { signaled_.store(true, std::memory_order_release); }
+
+    // Block until the fence is signaled (GPU completion handler has fired).
+    void wait() noexcept override {
+        dispatch_semaphore_wait(sem_, DISPATCH_TIME_FOREVER);
+        // Restore semaphore count so repeated wait() calls are safe.
+        dispatch_semaphore_signal(sem_);
+    }
+
+    // Called by MetalQueue::submit() before committing the command buffer.
+    // Captures shared_ptr and ARC-retained semaphore — safe even if the fence
+    // is destroyed before the GPU fires the handler.
+    void attach_completion_handler(id<MTLCommandBuffer> cmdBuf) {
+        auto flagRef = signaled_;          // shared_ptr copy keeps atomic alive
+        dispatch_semaphore_t sem = sem_;   // ARC retains sem for the block
+        [cmdBuf addCompletedHandler:^(id<MTLCommandBuffer>) {
+            flagRef->store(true, std::memory_order_release);
+            dispatch_semaphore_signal(sem);
+        }];
+    }
 
 private:
-    std::atomic<bool> signaled_;
+    std::shared_ptr<std::atomic<bool>> signaled_;
+    dispatch_semaphore_t sem_;
 };
 
 // ---------------------------------------------------------------------------
@@ -316,7 +340,20 @@ public:
             return Status::failure(StatusCode::invalid_state,
                                    "bind_index_buffer requires an active render pass");
         }
-        return Status::success(); // Phase 3C: store for indexed draws
+        return Status::success(); // TODO: store for indexed draws
+    }
+
+    Status bind_uniform_buffer(std::uint32_t binding,
+                                IBuffer&      buffer,
+                                std::size_t   offset) override {
+        if (!encoder_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "bind_uniform_buffer requires an active render pass");
+        }
+        id<MTLBuffer> mtlBuf = static_cast<MetalBuffer&>(buffer).native();
+        [encoder_ setVertexBuffer:mtlBuf   offset:offset atIndex:binding];
+        [encoder_ setFragmentBuffer:mtlBuf offset:offset atIndex:binding];
+        return Status::success();
     }
 
     Status set_viewport(float x, float y, float width, float height,
@@ -571,13 +608,10 @@ public:
             return Status::failure(StatusCode::invalid_argument,
                                    "submit: not a Metal command buffer");
         }
-        [mcmd->native() commit];
-        // Phase 3B: blocking wait when a fence is needed.
-        // Phase 3C: replace with async completion handler + semaphore.
         if (auto* mfence = dynamic_cast<MetalFence*>(signal_fence)) {
-            [mcmd->native() waitUntilCompleted];
-            mfence->signal();
+            mfence->attach_completion_handler(mcmd->native());
         }
+        [mcmd->native() commit];
         return Status::success();
     }
 

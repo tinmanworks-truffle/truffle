@@ -1,6 +1,8 @@
 #include "truffle/render/pipeline_cache.hpp"
 #include "truffle/render/renderer.hpp"
 
+#include <string>
+
 namespace truffle::render {
 
 // ---------------------------------------------------------------------------
@@ -18,6 +20,46 @@ rhi::IPipeline* NullPipelineCache::get_or_create(const InstanceLayout& /*layout*
         }
     }
     return pipeline_.get();
+}
+
+// ---------------------------------------------------------------------------
+// PipelineCache
+// ---------------------------------------------------------------------------
+
+PipelineCache::PipelineCache(rhi::IDevice& device, rhi::TextureFormat colorFormat)
+    : device_(&device), colorFormat_(colorFormat) {}
+
+void PipelineCache::register_shaders(MaterialId material, const ShaderBinding& shaders) {
+    shaders_[material] = shaders;
+}
+
+rhi::IPipeline* PipelineCache::get_or_create(const InstanceLayout& layout,
+                                              MaterialId material) {
+    const CacheKey key{layout.hash(), material};
+    if (auto it = pipelines_.find(key); it != pipelines_.end()) {
+        return it->second.get();
+    }
+
+    auto sit = shaders_.find(material);
+    if (sit == shaders_.end()) {
+        return nullptr; // no shaders registered for this material
+    }
+    const auto& sb = sit->second;
+
+    const std::string debugName =
+        "pipeline_mat" + std::to_string(static_cast<std::uint64_t>(material));
+    auto result = device_->create_pipeline({
+        .debugName      = debugName,
+        .vertexShader   = sb.vertexShader,
+        .fragmentShader = sb.fragmentShader,
+        .colorFormat    = colorFormat_,
+    });
+    if (!result.ok()) {
+        return nullptr;
+    }
+    auto& ptr = pipelines_[key];
+    ptr = std::move(result).value();
+    return ptr.get();
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +102,14 @@ core::Status Renderer::render(std::span<const RenderBatch> batches,
                 (void)cmd->bind_vertex_buffer(
                     i, *batch.bindings[i].buffer, batch.bindings[i].offset);
             }
+        }
+
+        if (batch.uniformBuffer.buffer) {
+            // Uniform buffers go immediately after the vertex binding slots.
+            constexpr std::uint32_t kUniformBinding = RenderBatch::kMaxBindings;
+            (void)cmd->bind_uniform_buffer(
+                kUniformBinding, *batch.uniformBuffer.buffer,
+                batch.uniformBuffer.offset);
         }
 
         if (const auto s =

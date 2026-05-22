@@ -120,6 +120,7 @@ struct PipelineDesc {
     IShader*          vertexShader   = nullptr;
     IShader*          fragmentShader = nullptr;
     PrimitiveTopology topology       = PrimitiveTopology::triangle_list;
+    TextureFormat     colorFormat    = TextureFormat::bgra8_unorm;
     bool              depthTest      = true;
     bool              depthWrite     = true;
 };
@@ -224,6 +225,8 @@ class IFence {
 public:
     virtual ~IFence() = default;
     [[nodiscard]] virtual bool signaled() const noexcept = 0;
+    // Block until the fence is signaled. Returns immediately if already signaled.
+    virtual void wait() noexcept = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -277,6 +280,10 @@ public:
         std::size_t offset = 0) = 0;
     [[nodiscard]] virtual core::Status bind_index_buffer(
         IBuffer& buffer, std::size_t offset = 0) = 0;
+    // Bind a uniform/constant buffer to both vertex and fragment stages.
+    [[nodiscard]] virtual core::Status bind_uniform_buffer(
+        std::uint32_t binding, IBuffer& buffer,
+        std::size_t offset = 0) = 0;
     [[nodiscard]] virtual core::Status set_viewport(
         float x, float y, float width, float height,
         float minDepth = 0.0f, float maxDepth = 1.0f) = 0;
