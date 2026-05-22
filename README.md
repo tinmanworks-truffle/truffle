@@ -9,8 +9,10 @@ simulations, CAD-style applications, games, and other graphics-heavy software.
 - Owner: TinMan
 - License: Apache-2.0
 - Visibility: Public
-- Promotion criteria: Backend-neutral contracts, examples, and tests establish
-  the first architecture baseline before production GPU backends land.
+- Reason: Truffle is public engineering work and this repository contains the
+  project baseline intended for outside review.
+- Promotion criteria to Public: Backend-neutral contracts, examples, and tests
+  establish the first architecture baseline before production GPU backends land.
 
 ## What This Project Is
 
@@ -35,6 +37,11 @@ together.
 
 ## Build
 
+Prerequisites:
+
+- CMake 3.23 or newer.
+- A C++20-capable toolchain.
+
 ```powershell
 cmake -S . -B build -DTRUFFLE_BUILD_TESTS=ON -DTRUFFLE_BUILD_EXAMPLES=ON
 cmake --build build
@@ -43,6 +50,13 @@ ctest --test-dir build --output-on-failure
 
 See `docs/charter.md`, `docs/architecture.md`, and `docs/roadmap.md` for the
 current project boundaries and backend direction.
+
+## Continuity And AI Guidance
+
+Cross-machine working state belongs in [`docs/handoff.md`](docs/handoff.md).
+AI sessions should start with [`AGENTS.md`](AGENTS.md) and
+[`AI_CONTEXT.md`](AI_CONTEXT.md). The local TinMan Doctrine snapshot lives under
+[`docs/doctrine/`](docs/doctrine/README.md).
 
 ## Attribution
 
@@ -61,7 +75,7 @@ the optional window target and use its surface-facing helper contracts.
 - `src/` target implementations
 - `tests/` contract tests
 - `examples/` embedding proofs
-- `docs/` charter, architecture, and backend roadmap
+- `docs/` charter, architecture, backend roadmap, handoff, and doctrine snapshot
 
 ## Contributing
 
