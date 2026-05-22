@@ -11,6 +11,10 @@
 
 namespace truffle::rhi {
 
+// Forward declarations — descriptor structs reference these before their class definitions
+class IShader;
+class ITexture;
+
 enum class BackendKind {
     null_backend,
     vulkan,
@@ -48,6 +52,22 @@ enum class NativeSurfaceKind {
     cocoa_layer,
     external,
 };
+
+enum class ShaderStage {
+    vertex,
+    fragment,
+    compute,
+};
+
+enum class PrimitiveTopology {
+    triangle_list,
+    triangle_strip,
+    line_list,
+    point_list,
+};
+
+enum class LoadOp  { load, clear, dont_care };
+enum class StoreOp { store, dont_care };
 
 struct Capabilities {
     bool presentation = false;
@@ -89,13 +109,18 @@ struct SamplerDesc {
 };
 
 struct ShaderDesc {
-    std::string entryPoint = "main";
+    ShaderStage            stage      = ShaderStage::vertex;
+    std::string            entryPoint = "main";
     std::vector<std::byte> bytecode;
 };
 
 struct PipelineDesc {
-    std::string debugName;
-    bool depthTest = true;
+    std::string       debugName;
+    IShader*          vertexShader   = nullptr;
+    IShader*          fragmentShader = nullptr;
+    PrimitiveTopology topology       = PrimitiveTopology::triangle_list;
+    bool              depthTest      = true;
+    bool              depthWrite     = true;
 };
 
 struct NativeSurface {
@@ -117,6 +142,34 @@ struct SwapchainDesc {
 
 struct FenceDesc {
     bool signaled = false;
+};
+
+// ---------------------------------------------------------------------------
+// Render pass descriptors
+// ---------------------------------------------------------------------------
+
+struct ClearColor {
+    float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
+};
+
+struct ColorAttachmentDesc {
+    ITexture*  texture    = nullptr;         // nullptr = swapchain drawable
+    LoadOp     loadOp     = LoadOp::clear;
+    StoreOp    storeOp    = StoreOp::store;
+    ClearColor clearValue = {};
+};
+
+struct DepthAttachmentDesc {
+    ITexture* texture    = nullptr;          // nullptr = no depth attachment
+    LoadOp    loadOp     = LoadOp::clear;
+    StoreOp   storeOp    = StoreOp::dont_care;
+    float     clearDepth = 1.0f;
+};
+
+struct RenderPassDesc {
+    Extent2D             extent;
+    ColorAttachmentDesc  colorAttachment;
+    DepthAttachmentDesc  depthAttachment;    // depthAttachment.texture==nullptr → no depth
 };
 
 class IBuffer {
@@ -158,6 +211,9 @@ public:
     virtual ~ISwapchain() = default;
     [[nodiscard]] virtual const SwapchainDesc& desc() const noexcept = 0;
     [[nodiscard]] virtual core::Status resize(Extent2D extent) = 0;
+    // Returns the current frame's color texture. Call once per frame before
+    // begin_render_pass. Returns nullptr if no drawable is available.
+    [[nodiscard]] virtual ITexture* acquire_next_texture() = 0;
 };
 
 class IFence {
@@ -166,13 +222,70 @@ public:
     [[nodiscard]] virtual bool signaled() const noexcept = 0;
 };
 
+// ---------------------------------------------------------------------------
+// Frame upload ring — N-buffered CPU-writable GPU-visible upload memory
+// ---------------------------------------------------------------------------
+
+struct FrameAllocation {
+    IBuffer*    buffer    = nullptr; // backing buffer; nullptr signals exhaustion
+    std::size_t offset    = 0;
+    void*       mappedPtr = nullptr; // CPU-writable pointer into the buffer
+    std::size_t size      = 0;
+
+    [[nodiscard]] bool valid() const noexcept { return buffer != nullptr; }
+};
+
+class IFrameUploadRing {
+public:
+    virtual ~IFrameUploadRing() = default;
+
+    // Allocate size bytes aligned to alignment from the current frame's range.
+    // Returns an invalid FrameAllocation (buffer == nullptr) if the ring is full.
+    [[nodiscard]] virtual FrameAllocation allocate(
+        std::size_t size, std::size_t alignment = 16) = 0;
+
+    // Advance to the next frame slot, reclaiming the oldest completed frame.
+    // Call once per frame after verifying prior GPU work is complete.
+    virtual void advance() = 0;
+
+    [[nodiscard]] virtual std::uint32_t frames_in_flight() const noexcept = 0;
+    [[nodiscard]] virtual std::size_t   capacity_per_frame() const noexcept = 0;
+};
+
 class ICommandBuffer {
 public:
     virtual ~ICommandBuffer() = default;
+
+    // Command buffer lifetime
     [[nodiscard]] virtual core::Status begin() = 0;
-    [[nodiscard]] virtual core::Status draw(std::uint32_t vertex_count) = 0;
     [[nodiscard]] virtual core::Status end() = 0;
     [[nodiscard]] virtual bool ready_for_submit() const noexcept = 0;
+
+    // Render pass
+    [[nodiscard]] virtual core::Status begin_render_pass(
+        const RenderPassDesc& desc) = 0;
+    [[nodiscard]] virtual core::Status end_render_pass() = 0;
+
+    // Resource binding
+    [[nodiscard]] virtual core::Status bind_pipeline(IPipeline& pipeline) = 0;
+    [[nodiscard]] virtual core::Status bind_vertex_buffer(
+        std::uint32_t binding, IBuffer& buffer,
+        std::size_t offset = 0) = 0;
+    [[nodiscard]] virtual core::Status bind_index_buffer(
+        IBuffer& buffer, std::size_t offset = 0) = 0;
+    [[nodiscard]] virtual core::Status set_viewport(
+        float x, float y, float width, float height,
+        float minDepth = 0.0f, float maxDepth = 1.0f) = 0;
+    [[nodiscard]] virtual core::Status set_scissor(
+        std::uint32_t x, std::uint32_t y,
+        std::uint32_t width, std::uint32_t height) = 0;
+
+    // Draw calls
+    [[nodiscard]] virtual core::Status draw(
+        std::uint32_t vertex_count) = 0;
+    [[nodiscard]] virtual core::Status draw_instanced(
+        std::uint32_t vertex_count,
+        std::uint32_t instance_count) = 0;
 };
 
 class IQueue {
@@ -205,6 +318,9 @@ public:
     create_swapchain(ISurface& surface, const SwapchainDesc& desc) = 0;
     [[nodiscard]] virtual std::unique_ptr<ICommandBuffer> create_command_buffer() = 0;
     [[nodiscard]] virtual std::unique_ptr<IFence> create_fence(const FenceDesc& desc) = 0;
+    [[nodiscard]] virtual core::Result<std::unique_ptr<IFrameUploadRing>>
+    create_upload_ring(std::uint32_t frames_in_flight,
+                       std::size_t   capacity_per_frame) = 0;
 };
 
 class IBackend {

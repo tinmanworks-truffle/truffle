@@ -9,8 +9,10 @@ simulations, CAD-style applications, games, and other graphics-heavy software.
 - Owner: TinMan
 - License: Apache-2.0
 - Visibility: Public
-- Promotion criteria: Backend-neutral contracts, examples, and tests establish
-  the first architecture baseline before production GPU backends land.
+- Reason: Truffle is public engineering work and this repository contains the
+  project baseline intended for outside review.
+- Promotion criteria to Public: Backend-neutral contracts, examples, and tests
+  establish the first architecture baseline before production GPU backends land.
 
 ## What This Project Is
 
@@ -19,15 +21,19 @@ flow, and GPU abstraction without forcing them into a game engine or application
 framework. It is not an application framework and it is not a dedicated game
 engine.
 
-The first implementation line focuses on stable architecture contracts before
-production GPU backends:
+The first implementation line focuses on stable architecture and build contracts
+before production GPU backends:
 
 - `truffle_core` owns shared status, configuration, and handle primitives.
 - `truffle_ecs` provides a general-purpose ECS world.
 - `truffle_rhi` defines backend-neutral GPU and presentation contracts.
 - `truffle_backend_null` validates RHI flow without a GPU dependency.
-- `truffle_render` extracts renderable ECS data and submits frames through RHI.
-- `truffle_window` provides optional window and surface-facing contracts.
+- `truffle_render` starts the independently consumable rendering layer above RHI.
+
+The renderer layer will accept more than one data path. ECS extraction stays a
+first-party convenience path, while large dynamic workloads can grow toward
+bulk, data-oriented, or GPU-resident render data without requiring per-entity
+conversion.
 
 Truffle has no dependency on FrameKit. A consumer may compose both projects in
 the same application when an application host and graphics system are useful
@@ -35,14 +41,43 @@ together.
 
 ## Build
 
+Prerequisites:
+
+- CMake 3.23 or newer.
+- A C++20-capable toolchain.
+- Ninja when using the checked-in CMake presets.
+- A C compiler and the native window-system development dependencies needed by
+  the copied GLFW source when examples are enabled.
+
 ```powershell
-cmake -S . -B build -DTRUFFLE_BUILD_TESTS=ON -DTRUFFLE_BUILD_EXAMPLES=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
 ```
 
 See `docs/charter.md`, `docs/architecture.md`, and `docs/roadmap.md` for the
 current project boundaries and backend direction.
+
+## CMake Consumers
+
+Truffle keeps each library layer linkable on its own. Install the configured
+workspace and import the package from a consumer:
+
+```cmake
+find_package(Truffle CONFIG REQUIRED)
+target_link_libraries(my_tool PRIVATE Truffle::RHI Truffle::Render)
+```
+
+The package currently exports `Truffle::Core`, `Truffle::ECS`, `Truffle::RHI`,
+`Truffle::BackendNull`, and `Truffle::Render`. Production backend options are
+reserved in CMake but remain disabled until their backend milestones land.
+
+## Continuity And AI Guidance
+
+Cross-machine working state belongs in [`docs/handoff.md`](docs/handoff.md).
+AI sessions should start with [`AGENTS.md`](AGENTS.md) and
+[`AI_CONTEXT.md`](AI_CONTEXT.md). The local TinMan Doctrine snapshot lives under
+[`docs/doctrine/`](docs/doctrine/README.md).
 
 ## Attribution
 
@@ -52,18 +87,20 @@ TinMan / George Gil in your project documentation.
 ## Use
 
 Embed only the targets your application needs. Host-owned window loops can link
-the RHI and renderer targets directly; graphics-only experiments can also link
-the optional window target and use its surface-facing helper contracts.
+the RHI and renderer targets directly and provide their own native surface
+boundary.
 
 ## Repository Layout
 
 - `include/` public Truffle contracts
-- `src/` target implementations
+- `src/` module implementations and backend ownership
+- `cmake/` package, install, warning, option, and developer-tooling helpers
 - `tests/` contract tests
-- `examples/` embedding proofs
-- `docs/` charter, architecture, and backend roadmap
+- `examples/` host-owned workspace integration proof
+- `docs/` charter, architecture, backend roadmap, handoff, and doctrine snapshot
 
 ## Contributing
 
 See `CONTRIBUTING.md` for the branch workflow, commit format, signing
-expectations, and pull request path into protected `master`.
+expectations, pull request path into protected `develop`, and stable promotion
+path into `master`.

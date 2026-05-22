@@ -1,39 +1,26 @@
 #pragma once
 
 #include "truffle/core/status.hpp"
-#include "truffle/ecs/world.hpp"
-#include "truffle/render/components.hpp"
+#include "truffle/render/pipeline_cache.hpp"
+#include "truffle/render/render_batch.hpp"
 #include "truffle/rhi/rhi.hpp"
 
-#include <vector>
+#include <span>
 
 namespace truffle::render {
 
-struct RenderItem {
-    ecs::Entity entity;
-    Transform transform;
-    MeshRenderer mesh;
-};
-
-struct ExtractedFrame {
-    std::vector<ecs::Entity> cameras;
-    std::vector<ecs::Entity> lights;
-    std::vector<RenderItem> renderItems;
-};
-
-class SceneExtractor {
-public:
-    [[nodiscard]] ExtractedFrame extract(ecs::World& world) const;
-};
-
 class Renderer {
 public:
-    explicit Renderer(rhi::IDevice& device);
+    explicit Renderer(rhi::IDevice& device, IPipelineCache* cache = nullptr);
 
-    [[nodiscard]] core::Status render(const ExtractedFrame& frame);
+    // Render batches. Pass a swapchain for presentation-capable paths;
+    // omit (or pass nullptr) for headless and null-backend testing.
+    [[nodiscard]] core::Status render(std::span<const RenderBatch> batches,
+                                      rhi::ISwapchain* swapchain = nullptr);
 
 private:
-    rhi::IDevice* device_ = nullptr;
+    rhi::IDevice*   device_ = nullptr;
+    IPipelineCache* cache_  = nullptr;
 };
 
 } // namespace truffle::render

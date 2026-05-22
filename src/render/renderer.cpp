@@ -1,45 +1,81 @@
+#include "truffle/render/pipeline_cache.hpp"
 #include "truffle/render/renderer.hpp"
 
 namespace truffle::render {
 
-ExtractedFrame SceneExtractor::extract(ecs::World& world) const {
-    ExtractedFrame frame;
+// ---------------------------------------------------------------------------
+// NullPipelineCache
+// ---------------------------------------------------------------------------
 
-    world.each<Transform, Camera>(
-        [&frame](ecs::Entity entity, Transform&, Camera&) {
-            frame.cameras.push_back(entity);
-        });
-    world.each<Transform, Light>(
-        [&frame](ecs::Entity entity, Transform&, Light&) {
-            frame.lights.push_back(entity);
-        });
-    world.each<Transform, MeshRenderer>(
-        [&frame](ecs::Entity entity, Transform& transform, MeshRenderer& mesh) {
-            frame.renderItems.push_back(RenderItem{entity, transform, mesh});
-        });
+NullPipelineCache::NullPipelineCache(rhi::IDevice& device) : device_(&device) {}
 
-    return frame;
+rhi::IPipeline* NullPipelineCache::get_or_create(const InstanceLayout& /*layout*/,
+                                                  MaterialId /*material*/) {
+    if (!pipeline_) {
+        auto result = device_->create_pipeline({.debugName = "null_pipeline"});
+        if (result.ok()) {
+            pipeline_ = std::move(result).value();
+        }
+    }
+    return pipeline_.get();
 }
 
-Renderer::Renderer(rhi::IDevice& device) : device_(&device) {}
+// ---------------------------------------------------------------------------
+// Renderer
+// ---------------------------------------------------------------------------
 
-core::Status Renderer::render(const ExtractedFrame& frame) {
-    auto commandBuffer = device_->create_command_buffer();
-    if (const auto status = commandBuffer->begin(); !status.ok()) {
-        return status;
+Renderer::Renderer(rhi::IDevice& device, IPipelineCache* cache)
+    : device_(&device), cache_(cache) {}
+
+core::Status Renderer::render(std::span<const RenderBatch> batches,
+                               rhi::ISwapchain* swapchain) {
+    auto cmd = device_->create_command_buffer();
+    if (const auto s = cmd->begin(); !s.ok()) {
+        return s;
     }
 
-    for (const auto& renderItem : frame.renderItems) {
-        if (const auto status = commandBuffer->draw(renderItem.mesh.vertexCount);
-            !status.ok()) {
-            return status;
+    // Build render pass from swapchain or use a minimal headless descriptor
+    rhi::RenderPassDesc passDesc;
+    if (swapchain) {
+        passDesc.extent                     = swapchain->desc().extent;
+        passDesc.colorAttachment.texture    = swapchain->acquire_next_texture();
+        passDesc.colorAttachment.loadOp     = rhi::LoadOp::clear;
+        passDesc.colorAttachment.storeOp    = rhi::StoreOp::store;
+    } else {
+        passDesc.extent = {1, 1}; // headless / null-backend
+    }
+    if (const auto s = cmd->begin_render_pass(passDesc); !s.ok()) {
+        return s;
+    }
+
+    for (const auto& batch : batches) {
+        if (cache_) {
+            if (auto* pipeline = cache_->get_or_create(batch.layout, batch.material)) {
+                (void)cmd->bind_pipeline(*pipeline);
+            }
+        }
+
+        for (std::uint32_t i = 0; i < RenderBatch::kMaxBindings; ++i) {
+            if (batch.bindings[i].buffer) {
+                (void)cmd->bind_vertex_buffer(
+                    i, *batch.bindings[i].buffer, batch.bindings[i].offset);
+            }
+        }
+
+        if (const auto s =
+                cmd->draw_instanced(batch.vertexCount, batch.instanceCount);
+            !s.ok()) {
+            return s;
         }
     }
 
-    if (const auto status = commandBuffer->end(); !status.ok()) {
-        return status;
+    if (const auto s = cmd->end_render_pass(); !s.ok()) {
+        return s;
     }
-    return device_->queue(rhi::QueueKind::graphics).submit(*commandBuffer);
+    if (const auto s = cmd->end(); !s.ok()) {
+        return s;
+    }
+    return device_->queue(rhi::QueueKind::graphics).submit(*cmd);
 }
 
 } // namespace truffle::render

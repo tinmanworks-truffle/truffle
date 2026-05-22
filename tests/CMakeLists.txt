@@ -10,3 +10,26 @@ add_executable(truffle_render_tests render_flow_tests.cpp)
 target_link_libraries(truffle_render_tests PRIVATE truffle_backend_null truffle_render)
 add_test(NAME truffle_render_tests COMMAND truffle_render_tests)
 
+add_executable(truffle_render_batch_tests render_batch_tests.cpp)
+target_link_libraries(truffle_render_batch_tests PRIVATE truffle_render)
+add_test(NAME truffle_render_batch_tests COMMAND truffle_render_batch_tests)
+
+add_executable(truffle_frame_ring_tests frame_ring_tests.cpp)
+target_link_libraries(truffle_frame_ring_tests PRIVATE truffle_backend_null)
+add_test(NAME truffle_frame_ring_tests COMMAND truffle_frame_ring_tests)
+
+add_executable(truffle_scene_adapter_tests scene_adapter_tests.cpp)
+target_link_libraries(truffle_scene_adapter_tests PRIVATE truffle_scene truffle_backend_null)
+add_test(NAME truffle_scene_adapter_tests COMMAND truffle_scene_adapter_tests)
+
+if(TRUFFLE_INSTALL)
+    add_test(
+        NAME truffle_package_consumer
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DTRUFFLE_BINARY_DIR=${PROJECT_BINARY_DIR}"
+            "-DTRUFFLE_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+            "-DTRUFFLE_INSTALL_PREFIX=${PROJECT_BINARY_DIR}/package-test/install"
+            "-DTRUFFLE_CONSUMER_BUILD_DIR=${PROJECT_BINARY_DIR}/package-test/consumer"
+            -P "${PROJECT_SOURCE_DIR}/cmake/VerifyInstall.cmake")
+endif()
