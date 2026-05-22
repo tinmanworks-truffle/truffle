@@ -13,28 +13,36 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Truffle is in Phase 2: Render Data Foundation. The renderer is now ECS-independent.
-`RenderBatch` and `InstanceLayout` are the universal renderer input contract.
-`IFrameUploadRing` provides N-buffered CPU-to-GPU upload memory. `truffle_scene`
-is the new optional ECS extraction adapter. Three data lanes (ECS extraction,
-bulk direct upload, future GPU-resident) are architecturally established.
+Truffle is in Phase 3A: RHI Contract Enrichment. The render-pass model, resource
+binding, and shader-stage contracts have been landed on branch
+`feat/phase3-rhi-contracts`. Phase 3B (Metal backend) is next.
 
 ## Current Work Status
 
-- `truffle_render` has zero compile-time dependency on `truffle_ecs`. The
-  `ExtractedFrame`/`SceneExtractor` API is replaced by `RenderBatch`/`InstanceLayout`.
-- `IFrameUploadRing` is defined in `truffle_rhi`; `NullFrameUploadRing` implements
-  it in the null backend. `IDevice::create_upload_ring()` is the factory.
-- `truffle_scene` provides `SceneAdapter::extract(World&, IFrameUploadRing&)`
-  returning a `SceneFrame` (camera state, light state, mesh batches). Transform
-  data is written directly into ring memory — no per-entity intermediate copy.
-- `IPipelineCache` interface and `NullPipelineCache` are in `truffle_render`.
-- ADRs 0004-0006 lock the render-batch model, frame upload ring, and GPU
-  transform hierarchy direction.
-- 10 tests pass: 3 smoke, ECS contracts, RHI null, render flow, render batch,
-  frame ring, scene adapter, package consumer. Package consumer exercises
-  `Truffle::Scene`.
-- `truffle_scene` is registered as an exported CMake target (`Truffle::Scene`).
+- Phase 3A complete on `feat/phase3-rhi-contracts`. 10/10 tests pass; CI preset
+  warnings-as-errors clean.
+- `include/truffle/rhi/rhi.hpp` enriched:
+  - `ShaderStage`, `PrimitiveTopology`, `LoadOp`, `StoreOp` enums.
+  - `ShaderDesc` carries a `stage` field.
+  - `PipelineDesc` carries `vertexShader`, `fragmentShader`, `topology`,
+    `depthWrite` alongside the existing `depthTest` and `debugName`.
+  - `RenderPassDesc`, `ColorAttachmentDesc`, `DepthAttachmentDesc`, `ClearColor`
+    structs define inline render pass configuration.
+  - `ISwapchain::acquire_next_texture()` returns the current frame drawable.
+  - `ICommandBuffer` expanded: `begin_render_pass`, `end_render_pass`,
+    `bind_pipeline`, `bind_vertex_buffer`, `bind_index_buffer`, `set_viewport`,
+    `set_scissor`; draw methods rearranged into logical sections.
+- `NullSwapchain::acquire_next_texture()` lazily allocates a `NullTexture`
+  drawable and returns it each frame.
+- `NullCommandBuffer` has stub implementations for all new methods; each
+  guards on `State::recording`.
+- `Renderer::render()` now takes an optional `rhi::ISwapchain*` (default
+  `nullptr`). When supplied it acquires the next texture and builds a proper
+  `RenderPassDesc`; headless path uses a `{1,1}` placeholder extent.
+  The render loop calls `bind_pipeline`, `bind_vertex_buffer`, `begin/end_render_pass`.
+- Tests updated: `rhi_null_tests` exercises full enriched command sequence;
+  `render_flow_tests` covers both headless and swapchain render paths.
+- ADR 0007 records the inline render-pass model decision.
 
 ## Relevant Decisions And Constraints
 
@@ -71,35 +79,30 @@ bulk direct upload, future GPU-resident) are architecturally established.
 
 ## Last Verified Commands And Checks
 
-Verified on 2026-05-22:
+Verified on 2025-05-22 (Phase 3A):
 
 ```sh
-cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
-cmake --preset ci
 cmake --build --preset ci
 ctest --preset ci
-cmake -S . -B build/foundation-default
-cmake --build build/foundation-default
 ```
 
-10 tests pass: 3 host workspace smoke checks, ECS contracts, null RHI, render
-flow (direct batch), render batch types, frame ring, scene adapter (ECS→batch),
-and installed package consumer. CI preset (warnings-as-errors) clean.
-`grep -r "ecs/world" include/truffle/render/` returns nothing.
+10 tests pass (dev + ci). CI preset warnings-as-errors clean.
+All new ICommandBuffer stubs, swapchain acquire, and render-pass flow exercised.
 
 ## Next Resume Steps
 
-1. Read `AGENTS.md`, the README, contributor guidance, and the architecture
-   docs before changing scope.
-2. Check the current branch and open pull request state before starting work.
-3. Phase 2 render data foundation branch is `feat/render-data-foundation`.
-   Open a PR to `develop` when ready.
-4. Phase 3 next steps: frame graph / render pass orchestration, shader
-   reflection direction, material system boundary, GPU transform hierarchy
-   compute pass.
-5. Update this handoff before stopping on another machine.
+1. Read `AGENTS.md`, the README, contributor guidance, and architecture docs.
+2. Check current branch (`feat/phase3-rhi-contracts`) and open PR state.
+3. Open a PR from `feat/phase3-rhi-contracts` → `develop`, get review.
+4. Phase 3B: Metal backend in `src/backends/metal/`.
+   - `NullBackend` as structural guide; implement `MetalDevice`, `MetalCommandBuffer`,
+     `MetalSwapchain`, `MTLRenderPassDescriptor` mapping from `RenderPassDesc`.
+   - Add `TRUFFLE_BACKEND_METAL` CMake option.
+5. Phase 3C: Material system — uniform upload path, `IShader` bytecode loading,
+   real `IPipelineCache` with layout+material hash keying.
+6. Update this handoff before stopping on another machine.
 
 ## Open Questions Or Risks
 

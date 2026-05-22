@@ -67,8 +67,20 @@ public:
         return Status::success();
     }
 
+    [[nodiscard]] ITexture* acquire_next_texture() override {
+        if (!drawable_) {
+            drawable_ = std::make_unique<NullTexture>(TextureDesc{
+                .extent    = desc_.extent,
+                .format    = desc_.format,
+                .debugName = "swapchain_drawable",
+            });
+        }
+        return drawable_.get();
+    }
+
 private:
-    SwapchainDesc desc_;
+    SwapchainDesc                desc_;
+    std::unique_ptr<NullTexture> drawable_;
 };
 
 class NullFence final : public IFence {
@@ -93,6 +105,71 @@ public:
                                    "command buffer can begin once");
         }
         state_ = State::recording;
+        return Status::success();
+    }
+
+    [[nodiscard]] Status begin_render_pass(
+        const RenderPassDesc& /*desc*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "begin_render_pass requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status end_render_pass() override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "end_render_pass requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status bind_pipeline(IPipeline& /*pipeline*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "bind_pipeline requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status bind_vertex_buffer(std::uint32_t /*binding*/,
+                                             IBuffer& /*buffer*/,
+                                             std::size_t /*offset*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "bind_vertex_buffer requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status bind_index_buffer(IBuffer& /*buffer*/,
+                                            std::size_t /*offset*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "bind_index_buffer requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status set_viewport(float /*x*/, float /*y*/,
+                                       float /*width*/, float /*height*/,
+                                       float /*minDepth*/,
+                                       float /*maxDepth*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "set_viewport requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status set_scissor(std::uint32_t /*x*/, std::uint32_t /*y*/,
+                                      std::uint32_t /*width*/,
+                                      std::uint32_t /*height*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "set_scissor requires recording");
+        }
         return Status::success();
     }
 
