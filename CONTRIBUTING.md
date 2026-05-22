@@ -75,6 +75,11 @@ Examples:
 ## Code Quality
 
 - Follow `.editorconfig`.
+- Use `cmake --preset dev`, `cmake --build --preset dev`, and
+  `ctest --preset dev` for the default local foundation check path.
+- Run `cmake --build --preset dev --target truffle_format_check` when
+  `clang-format` is available; use `truffle_format` to apply the repository
+  formatting baseline.
 - Keep module boundaries explicit and public contracts documented.
 - Keep the default CMake build path reproducible and optional tooling
   non-blocking.

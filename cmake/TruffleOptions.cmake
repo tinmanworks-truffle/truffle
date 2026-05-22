@@ -1,0 +1,10 @@
+option(TRUFFLE_BUILD_TESTS "Build Truffle contract tests" ${PROJECT_IS_TOP_LEVEL})
+option(TRUFFLE_BUILD_EXAMPLES "Build Truffle examples" ${PROJECT_IS_TOP_LEVEL})
+option(TRUFFLE_INSTALL "Add Truffle install and package export rules" ${PROJECT_IS_TOP_LEVEL})
+option(TRUFFLE_WARNINGS_AS_ERRORS "Treat Truffle target warnings as errors" OFF)
+
+option(TRUFFLE_BUILD_BACKEND_NULL "Build the Truffle null validation backend" ON)
+option(TRUFFLE_BUILD_BACKEND_VULKAN "Build the future Truffle Vulkan backend" OFF)
+option(TRUFFLE_BUILD_BACKEND_DIRECT3D "Build the future Truffle Direct3D backend" OFF)
+option(TRUFFLE_BUILD_BACKEND_METAL "Build the future Truffle Metal backend" OFF)
+option(TRUFFLE_BUILD_BACKEND_OPENGL "Build the future Truffle OpenGL backend" OFF)
