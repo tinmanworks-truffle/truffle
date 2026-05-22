@@ -26,10 +26,3 @@ target_include_directories(truffle_render PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(truffle_render PUBLIC truffle_ecs truffle_rhi)
 target_compile_features(truffle_render PUBLIC cxx_std_20)
 add_library(Truffle::Render ALIAS truffle_render)
-
-add_library(truffle_window STATIC window/window.cpp)
-target_include_directories(truffle_window PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(truffle_window PUBLIC truffle_core truffle_rhi)
-target_compile_features(truffle_window PUBLIC cxx_std_20)
-add_library(Truffle::Window ALIAS truffle_window)
-

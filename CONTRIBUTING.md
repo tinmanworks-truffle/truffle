@@ -22,6 +22,15 @@ workflow, commit messages, and signed repository history.
 - Run the relevant build and test checks before requesting merge.
 - Merge only signed commits into protected branches.
 
+## Stop And Resume
+
+Before switching machines or stopping active work:
+
+- Update `docs/handoff.md` with the current status, verification, and next steps.
+- Promote durable decisions from the handoff into project docs or ADRs.
+- Run the relevant build and test checks.
+- Commit and push the branch together with the handoff update.
+
 ## Commit Message Format
 
 Use Doctrine commit format:
@@ -59,8 +68,9 @@ Examples:
 
 - Public Truffle authorship should use `TinMan` unless a legal or personal
   context explicitly requires another identity.
+- All local commits must be signed.
 - Protected branch commits must be signed.
-- Configure Git signing before pushing a branch intended for merge.
+- Configure Git signing before creating repository history intended to be kept.
 
 ## Code Quality
 
@@ -68,4 +78,3 @@ Examples:
 - Keep module boundaries explicit and public contracts documented.
 - Keep the default CMake build path reproducible and optional tooling
   non-blocking.
-

@@ -11,5 +11,5 @@ Current baseline:
   command, queue, fence, and capability flow.
 - Null backend used to validate contracts without a production GPU backend.
 - Renderer extraction of camera, light, and mesh-facing ECS components.
-- Optional headless window helper that proves window/surface integration shape.
-
+- Host-owned workspace example that uses a visible GLFW window for editor, CAD,
+  and simulation-facing app roles while the Truffle path stays null-backed.
