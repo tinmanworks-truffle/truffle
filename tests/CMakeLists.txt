@@ -22,6 +22,12 @@ add_executable(truffle_scene_adapter_tests scene_adapter_tests.cpp)
 target_link_libraries(truffle_scene_adapter_tests PRIVATE truffle_scene truffle_backend_null)
 add_test(NAME truffle_scene_adapter_tests COMMAND truffle_scene_adapter_tests)
 
+if(TRUFFLE_BUILD_BACKEND_METAL)
+    add_executable(truffle_metal_tests metal_backend_tests.cpp)
+    target_link_libraries(truffle_metal_tests PRIVATE truffle_backend_metal)
+    add_test(NAME truffle_metal_tests COMMAND truffle_metal_tests)
+endif()
+
 if(TRUFFLE_INSTALL)
     add_test(
         NAME truffle_package_consumer

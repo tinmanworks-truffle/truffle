@@ -14,6 +14,7 @@ namespace truffle::rhi {
 // Forward declarations — descriptor structs reference these before their class definitions
 class IShader;
 class ITexture;
+class ICommandBuffer; // used in ISwapchain::schedule_present
 
 enum class BackendKind {
     null_backend,
@@ -214,6 +215,9 @@ public:
     // Returns the current frame's color texture. Call once per frame before
     // begin_render_pass. Returns nullptr if no drawable is available.
     [[nodiscard]] virtual ITexture* acquire_next_texture() = 0;
+    // Schedule presentation of the current drawable via the given command buffer.
+    // Must be called after end_render_pass() and before end(). No-op for headless.
+    [[nodiscard]] virtual core::Status schedule_present(ICommandBuffer& cmd) = 0;
 };
 
 class IFence {
