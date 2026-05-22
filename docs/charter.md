@@ -11,7 +11,7 @@ requiring a game-engine object model or application framework.
 - Backend-neutral RHI and renderer contracts.
 - Render-facing ECS components and scene extraction.
 - A general ECS suitable for tools, simulations, and games.
-- Optional window and presentation helpers for graphics-focused consumers.
+- Presentation contracts for consumer-owned native surfaces.
 - Validation backends, examples, and contract tests that keep backend work honest.
 
 ## Out of Scope
@@ -24,7 +24,5 @@ requiring a game-engine object model or application framework.
 ## Integration Boundary
 
 Truffle can run inside a consumer-owned loop and on a consumer-owned native
-surface. A consumer may also use optional Truffle window helpers. FrameKit and
-Truffle remain independent projects; applications that need both compose them at
-their own boundary.
-
+surface. FrameKit and Truffle remain independent projects; applications that
+need both compose them at their own boundary.

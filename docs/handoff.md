@@ -11,19 +11,18 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 Truffle is establishing its first architecture baseline for an embeddable C++20
 graphics and rendering system. Current code proves ECS, renderer extraction,
-backend-neutral RHI flow, the null backend, host-owned surfaces, and the optional
-window-facing integration path before production GPU backends land.
+backend-neutral RHI flow, the null backend, and host-owned surfaces before
+production GPU backends land.
 
 ## Current Work Status
 
 - The repository is still in the Phase 1 contract stage described by the
   roadmap.
-- Public targets exist for core, ECS, RHI, the null backend, rendering, and the
-  optional window layer.
-- Finite null-backend examples exercise both a host-owned surface consumer and a
-  consumer using Truffle's headless window helper.
+- Public targets exist for core, ECS, RHI, the null backend, and rendering.
+- The host workspace example owns a visible GLFW window and separates editor,
+  CAD, and simulation-facing workspace roles over Truffle's null-backed path.
 - Tests cover ECS contract flow, null RHI flow, renderer flow, and smoke checks
-  for both examples.
+  for each host workspace role.
 - Repository continuity now uses this tracked handoff plus the local Doctrine AI
   baseline rooted at `AGENTS.md`.
 
@@ -34,6 +33,8 @@ window-facing integration path before production GPU backends land.
 - Consumers may compose Truffle with FrameKit, but Truffle must not depend on it.
 - Public rendering flow stays backend-neutral; production GPU backends are later
   roadmap work.
+- Truffle does not own native window helpers in the current baseline. Host apps
+  provide their own windowing and native surface boundary.
 - Keep active handoff state curated and public-safe. Lasting decisions belong in
   stable docs or ADRs.
 - Normal feature and fix work targets protected `develop`; stable promotion goes
@@ -48,8 +49,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The configured suite passed with five tests: two example smoke checks and the
-ECS, null RHI, and render flow tests.
+The configured suite passed with six tests: three host workspace smoke checks
+and the ECS, null RHI, and render flow tests.
 
 ## Next Resume Steps
 

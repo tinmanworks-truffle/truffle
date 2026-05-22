@@ -29,7 +29,6 @@ production GPU backends:
 - `truffle_rhi` defines backend-neutral GPU and presentation contracts.
 - `truffle_backend_null` validates RHI flow without a GPU dependency.
 - `truffle_render` extracts renderable ECS data and submits frames through RHI.
-- `truffle_window` provides optional window and surface-facing contracts.
 
 Truffle has no dependency on FrameKit. A consumer may compose both projects in
 the same application when an application host and graphics system are useful
@@ -41,6 +40,8 @@ Prerequisites:
 
 - CMake 3.23 or newer.
 - A C++20-capable toolchain.
+- A C compiler and the native window-system development dependencies needed by
+  the copied GLFW source when examples are enabled.
 
 ```powershell
 cmake -S . -B build -DTRUFFLE_BUILD_TESTS=ON -DTRUFFLE_BUILD_EXAMPLES=ON
@@ -66,15 +67,15 @@ TinMan / George Gil in your project documentation.
 ## Use
 
 Embed only the targets your application needs. Host-owned window loops can link
-the RHI and renderer targets directly; graphics-only experiments can also link
-the optional window target and use its surface-facing helper contracts.
+the RHI and renderer targets directly and provide their own native surface
+boundary.
 
 ## Repository Layout
 
 - `include/` public Truffle contracts
 - `src/` target implementations
 - `tests/` contract tests
-- `examples/` embedding proofs
+- `examples/` host-owned workspace integration proof
 - `docs/` charter, architecture, backend roadmap, handoff, and doctrine snapshot
 
 ## Contributing

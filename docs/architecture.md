@@ -8,15 +8,14 @@
    surfaces, swapchains, synchronization, and capability descriptions.
 4. `truffle_render` extracts ECS scene data and builds frame submissions above
    the RHI.
-5. `truffle_window` adds optional window and native-surface facing contracts.
-6. `truffle_backend_*` targets implement RHI contracts behind the public layer.
+5. `truffle_backend_*` targets implement RHI contracts behind the public layer.
 
 ## Repository Shape
 
 Public contracts stay under `include/truffle`. Runtime implementations stay
-under `src`. The first workspace uses finite consumer examples and tests as
-proof of the host-owned surface path, the optional window-facing path, ECS
-queries, resource setup, swapchain resize, and RHI submission flow.
+under `src`. The first workspace uses a host-owned example and tests as proof of
+the consumer surface path, ECS queries, resource setup, swapchain resize, and
+RHI submission flow.
 
 ## Data Flow
 
@@ -29,6 +28,6 @@ OpenGL, or Metal without changing higher-level ECS ownership.
 
 The repository starts with contracts, a null backend, examples, and tests. The
 null backend validates resource creation, command recording, surface/swapchain
-flow, and submission flow without requiring a GPU or native window. The richer
-example apps keep application loops outside Truffle while simulating mixed
-viewport, simulation, and game-like render usage.
+flow, and submission flow without requiring a GPU. The host workspace example
+keeps native window ownership and application loops outside Truffle while
+separating editor, CAD, and simulation scene roles.
