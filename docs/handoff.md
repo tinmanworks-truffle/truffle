@@ -13,37 +13,30 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Truffle is in Phase 3B: Metal backend. A fully functional Metal backend is on
-branch `feat/phase3-metal-backend`, pending PR to `develop`. Phase 3C
-(Material system) is next.
+Phases 3A–3E complete and merged to `develop` (PR #9). `develop` is now at
+`be4810f`. No open feature branches. Next planned work is Phase 4 (shader
+variant pipeline, GPU-resident batch path, or additional backend targets).
 
 ## Current Work Status
 
-- Phase 3A + 3B complete on `feat/phase3-metal-backend`. 11/11 tests pass; CI
-  preset warnings-as-errors clean.
-- `include/truffle/rhi/rhi.hpp`: added `ISwapchain::schedule_present(ICommandBuffer&)`
-  to let swapchain implementations hook presentation into the command buffer
-  before commit. `ICommandBuffer` forward-declared to avoid circular ordering.
-- `include/truffle/rhi/metal_backend.hpp` + `src/backends/metal/metal_backend.mm`:
-  full Metal backend implementation:
-  - `MetalBuffer`: `MTLResourceStorageModeShared` (CPU+GPU visible, Phase 3B).
-  - `MetalTexture`: `MTLStorageModePrivate` + `RenderTarget|ShaderRead` usage.
-  - `MetalSampler`, `MetalShader` (MSL source compiled via
-    `newLibraryWithSource:options:error:`), `MetalPipeline`
-    (`MTLRenderPipelineState`, BGRA8Unorm colour attachment, Phase 3B).
-  - `MetalSurface` (wraps `CAMetalLayer*` from `cocoa_layer` native handle);
-    `MetalSwapchain` (headless offscreen or CAMetalLayer-backed).
-  - `MetalCommandBuffer`: full render pass + resource binding + draw calls via
-    `id<MTLRenderCommandEncoder>`.
-  - `MetalQueue::submit`: calls `[cmdBuf commit]`; blocking
-    `waitUntilCompleted` when a fence is requested (Phase 3B; async in 3C).
-  - `MetalFrameUploadRing`: N `MTLResourceStorageModeShared` buffers.
-  - `MetalDevice`, `MetalBackend` (`MTLCreateSystemDefaultDevice`).
-- `cmake/TruffleOptions.cmake`: Metal option defaults ON for Apple top-level builds.
-- `src/backends/CMakeLists.txt`: Metal backend wired in (Apple-only guard).
-- `tests/metal_backend_tests.cpp`: exercises buffer, shader compile, pipeline,
-  headless swapchain, full render pass, upload ring, fence, resize.
-  Skips gracefully when no Metal GPU is present.
+- **Phase 3C — Material system** (merged, PR #9):
+  - `PipelineDesc::colorFormat` — pipelines no longer hardcode BGRA8Unorm.
+  - `ShaderBinding` struct + `IPipelineCache::register_shaders()` added.
+  - `PipelineCache` — hash-map cache keyed on `(InstanceLayout::hash(), MaterialId)`.
+  - `RenderBatch::uniformBuffer` — per-batch constant data bound at slot
+    `kMaxBindings` (8) on both VS and FS via new `ICommandBuffer::bind_uniform_buffer()`.
+- **Phase 3D — Async Metal fence** (merged, PR #9):
+  - `MetalFence` uses `dispatch_semaphore_t` + `shared_ptr<atomic<bool>>`; safe
+    against fence outliving the GPU completion block.
+  - `MetalQueue::submit()` uses async `addCompletedHandler:` instead of
+    `waitUntilCompleted`.
+  - `IFence` gains `wait()` for CPU synchronisation; null backend no-ops it.
+- **Phase 3E — CAMetalLayer host wiring** (merged, PR #9):
+  - `host_window_metal.mm` — attaches `CAMetalLayer` to GLFW window content view,
+    returns as `void*` via `HostWindow::native_layer_handle()`.
+  - `application.cpp` — `run_interactive_metal()` uses Metal backend with real
+    MSL shaders, `cocoa_layer` surface, and `PipelineCache`; activated by `--metal`.
+  - CMakeLists.txt conditionally compiles `.mm` and links `truffle_backend_metal`.
 
 ## Relevant Decisions And Constraints
 
@@ -62,8 +55,9 @@ branch `feat/phase3-metal-backend`, pending PR to `develop`. Phase 3C
 - `ChannelKind::LocalTransform` and `ParentIndex` are reserved for a future
   GPU-side compute pass for hierarchy resolution (see ADR 0006). No implementation
   yet.
-- `IPipelineCache` is a placeholder interface; production shader variant selection
-  is Phase 3/4 work.
+- `IPipelineCache` now has a real keyed implementation (`PipelineCache`);
+  `NullPipelineCache` remains for null-backend-only use. Production shader
+  variant selection is Phase 4 work.
 - `truffle_scene` is optional. Consumers can build against `truffle_render` only
   and manage batches directly.
 - Truffle does not own native window helpers in the current baseline. Host apps
@@ -80,7 +74,7 @@ branch `feat/phase3-metal-backend`, pending PR to `develop`. Phase 3C
 
 ## Last Verified Commands And Checks
 
-Verified on 2025-05-22 (Phase 3B):
+Verified on 2025-05-22 (Phase 3C/D/E, PR #9):
 
 ```sh
 cmake --preset dev  -DTRUFFLE_BUILD_BACKEND_METAL=ON
@@ -96,17 +90,14 @@ frame ring, scene adapter, Metal backend, package consumer.
 
 ## Next Resume Steps
 
-1. Read `AGENTS.md`, the README, contributor guidance, and architecture docs.
-2. Check current branch (`feat/phase3-metal-backend`) and open PR state.
-3. Open a PR from `feat/phase3-metal-backend` → `develop`, get review.
-4. Phase 3C: Material system.
-   - Add `colorFormat` field to `PipelineDesc` (remove the BGRA8Unorm hardcode).
-   - Real `IPipelineCache` keyed on `InstanceLayout::hash()` + material.
-   - Uniform buffer upload path via `IFrameUploadRing`.
-   - `IShader` bytecode loading utility (file or embedded bytes).
-5. Phase 3D: Async fence (replace blocking `waitUntilCompleted` with
-   `dispatch_semaphore` completion handler in Metal backend).
-6. Update this handoff before stopping on another machine.
+1. Read `AGENTS.md`, README, contributor guidance, and architecture docs.
+2. Confirm `develop` is at `be4810f` and all tests pass.
+3. Phase 4 candidates:
+   - Shader variant pipeline (hot-reload, permutation keys).
+   - GPU-resident batch path (indirect draw with GPU-side buffer management).
+   - Additional backend target (Vulkan stub or Null-backend validation layer).
+   - Performance: remove allocations in hot render loop (arena/pool allocators).
+4. Update this handoff before stopping on another machine.
 
 ## Open Questions Or Risks
 
