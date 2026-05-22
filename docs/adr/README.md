@@ -16,3 +16,6 @@ Architecture decisions that need long-term tradeoff history belong here.
 - `0006-gpu-transform-hierarchy-direction.md` reserves `LocalTransform` and
   `ParentIndex` channel kinds and defers GPU compute-pass implementation to
   Phase 3/4.
+- `0007-render-pass-model.md` adopts an inline `RenderPassDesc` model
+  (Metal-style) over pre-compiled pass objects, mapping cleanly to
+  `MTLRenderPassDescriptor` and leaving a Vulkan caching path open.

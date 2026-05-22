@@ -13,7 +13,10 @@ class Renderer {
 public:
     explicit Renderer(rhi::IDevice& device, IPipelineCache* cache = nullptr);
 
-    [[nodiscard]] core::Status render(std::span<const RenderBatch> batches);
+    // Render batches. Pass a swapchain for presentation-capable paths;
+    // omit (or pass nullptr) for headless and null-backend testing.
+    [[nodiscard]] core::Status render(std::span<const RenderBatch> batches,
+                                      rhi::ISwapchain* swapchain = nullptr);
 
 private:
     rhi::IDevice*   device_ = nullptr;

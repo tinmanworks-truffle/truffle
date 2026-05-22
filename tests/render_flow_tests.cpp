@@ -45,10 +45,30 @@ int main() {
     batch.kind          = truffle::render::DrawKind::Direct;
 
     const truffle::render::RenderBatch batches[] = {batch};
-    TRUFFLE_CHECK(truffle::render::Renderer{*device}.render(batches).ok());
 
-    // One draw call per batch (instanced), one submission.
+    // --- Headless path (no swapchain) ---
+    TRUFFLE_CHECK(truffle::render::Renderer{*device}.render(batches).ok());
     TRUFFLE_CHECK(backend->stats().drawsRecorded == 1);
-    TRUFFLE_CHECK(backend->stats().submissions == 1);
+    TRUFFLE_CHECK(backend->stats().submissions   == 1);
+
+    // --- Swapchain path ---
+    auto surfaceResult = device->create_surface({
+        .native        = {.kind = truffle::rhi::NativeSurfaceKind::headless},
+        .initialExtent = {640, 480},
+    });
+    TRUFFLE_CHECK(surfaceResult.ok());
+    auto surface = std::move(surfaceResult).value();
+
+    auto swapchainResult = device->create_swapchain(
+        *surface, {.extent = {640, 480}, .framesInFlight = 2});
+    TRUFFLE_CHECK(swapchainResult.ok());
+    auto swapchain = std::move(swapchainResult).value();
+
+    truffle::render::Renderer renderer{*device};
+    TRUFFLE_CHECK(renderer.render(batches, swapchain.get()).ok());
+
+    // Two draws total (headless + swapchain), two submissions
+    TRUFFLE_CHECK(backend->stats().drawsRecorded == 2);
+    TRUFFLE_CHECK(backend->stats().submissions   == 2);
     return 0;
 }
