@@ -3,6 +3,10 @@
 Use this document as Truffle's rolling cross-machine handoff. Keep it useful to
 a human resuming work and to a fresh AI session reading the repository.
 
+AI work that reaches a commit must update this handoff before that commit so
+status, decisions, verification, next steps, and open risks remain current as
+applicable.
+
 Do not store raw AI transcripts, secrets, personal-only notes, or machine-private
 details here. Promote durable project direction into the roadmap, architecture
 docs, charter, or ADRs instead of leaving it only in this working document.
@@ -24,7 +28,8 @@ production GPU backends land.
 - Tests cover ECS contract flow, null RHI flow, renderer flow, and smoke checks
   for each host workspace role.
 - Repository continuity now uses this tracked handoff plus the local Doctrine AI
-  baseline rooted at `AGENTS.md`.
+  baseline rooted at `AGENTS.md`, including the rule that AI-authored commits
+  keep this handoff current.
 
 ## Relevant Decisions And Constraints
 
@@ -35,6 +40,9 @@ production GPU backends land.
   roadmap work.
 - Truffle does not own native window helpers in the current baseline. Host apps
   provide their own windowing and native surface boundary.
+- The host workspace keeps a pinned, example-local GLFW source copy narrowed to
+  the GLFW library build path rather than a submodule or full upstream repo
+  snapshot.
 - Keep active handoff state curated and public-safe. Lasting decisions belong in
   stable docs or ADRs.
 - Normal feature and fix work targets protected `develop`; stable promotion goes
@@ -45,6 +53,7 @@ production GPU backends land.
 Verified on 2026-05-22:
 
 ```sh
+cmake -S . -B build -DTRUFFLE_BUILD_TESTS=ON -DTRUFFLE_BUILD_EXAMPLES=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
