@@ -170,7 +170,8 @@ int main() {
     TRUFFLE_CHECK(device->queue(truffle::rhi::QueueKind::graphics)
                       .submit(*cmd3, fence.get())
                       .ok());
-    TRUFFLE_CHECK(fence->signaled()); // blocking wait in Phase 3B submit
+    fence->wait(); // async completion handler — block until GPU signals
+    TRUFFLE_CHECK(fence->signaled());
 
     // --- Swapchain resize ---
     TRUFFLE_CHECK(swapchain->resize({640, 480}).ok());

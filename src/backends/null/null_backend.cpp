@@ -93,6 +93,7 @@ public:
 
     [[nodiscard]] bool signaled() const noexcept override { return signaled_; }
     void signal() noexcept { signaled_ = true; }
+    void wait() noexcept override { /* already signaled synchronously before submit returns */ }
 
 private:
     bool signaled_ = false;
@@ -152,6 +153,16 @@ public:
         if (state_ != State::recording) {
             return Status::failure(StatusCode::invalid_state,
                                    "bind_index_buffer requires recording");
+        }
+        return Status::success();
+    }
+
+    [[nodiscard]] Status bind_uniform_buffer(std::uint32_t /*binding*/,
+                                              IBuffer& /*buffer*/,
+                                              std::size_t /*offset*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "bind_uniform_buffer requires recording");
         }
         return Status::success();
     }

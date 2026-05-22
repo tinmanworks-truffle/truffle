@@ -109,6 +109,8 @@ struct RenderBatch {
     BufferView indexBuffer;
     // Optional: indirect draw args buffer for DrawKind::Indirect*
     BufferView indirectBuffer;
+    // Optional: per-batch uniform/constant data (VS + FS params)
+    BufferView uniformBuffer;
 };
 
 } // namespace truffle::render
