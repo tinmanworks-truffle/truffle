@@ -11,9 +11,9 @@
 namespace truffle::examples::host_workspace {
 
 struct FrameShape {
-    std::size_t cameras = 0;
-    std::size_t lights = 0;
-    std::size_t renderItems = 0;
+    std::size_t cameras     = 0;
+    std::size_t lights      = 0;
+    std::size_t meshBatches = 0; // batches produced by SceneAdapter (not per-entity)
 };
 
 enum class WorkspaceKind {

@@ -18,7 +18,7 @@ add_executable(
 target_include_directories(truffle_host_workspace_example PRIVATE src)
 target_link_libraries(
     truffle_host_workspace_example
-    PRIVATE glfw truffle_backend_null truffle_render)
+    PRIVATE glfw truffle_backend_null truffle_scene truffle_render)
 
 if(TRUFFLE_BUILD_TESTS)
     add_test(

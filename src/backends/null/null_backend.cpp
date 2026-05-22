@@ -105,6 +105,16 @@ public:
         return Status::success();
     }
 
+    [[nodiscard]] Status draw_instanced(std::uint32_t vertex_count,
+                                        std::uint32_t instance_count) override {
+        if (state_ != State::recording || vertex_count == 0 || instance_count == 0) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_instanced requires a recording command buffer");
+        }
+        ++stats_->value.drawsRecorded;
+        return Status::success();
+    }
+
     [[nodiscard]] Status end() override {
         if (state_ != State::recording) {
             return Status::failure(StatusCode::invalid_state,
@@ -147,6 +157,56 @@ public:
 
 private:
     std::shared_ptr<SharedStats> stats_;
+};
+
+class NullFrameUploadRing final : public IFrameUploadRing {
+public:
+    NullFrameUploadRing(std::uint32_t framesInFlight, std::size_t capacityPerFrame)
+        : framesInFlight_(framesInFlight)
+        , capacityPerFrame_(capacityPerFrame)
+        , storage_(static_cast<std::size_t>(framesInFlight) * capacityPerFrame)
+        , backingBuffer_(BufferDesc{
+              .size      = static_cast<std::size_t>(framesInFlight) * capacityPerFrame,
+              .usage     = BufferUsage::storage,
+              .debugName = "upload_ring",
+          }) {}
+
+    [[nodiscard]] FrameAllocation allocate(std::size_t size,
+                                           std::size_t alignment) override {
+        std::size_t base = frameOffset_;
+        if (alignment > 1) {
+            base = (base + alignment - 1) & ~(alignment - 1);
+        }
+        const std::size_t frameEnd =
+            (static_cast<std::size_t>(currentFrame_) + 1) * capacityPerFrame_;
+        if (base + size > frameEnd || size == 0) {
+            return {};
+        }
+        void* ptr     = storage_.data() + base;
+        frameOffset_  = base + size;
+        return FrameAllocation{&backingBuffer_, base, ptr, size};
+    }
+
+    void advance() override {
+        currentFrame_ = (currentFrame_ + 1) % framesInFlight_;
+        frameOffset_  = static_cast<std::size_t>(currentFrame_) * capacityPerFrame_;
+    }
+
+    [[nodiscard]] std::uint32_t frames_in_flight() const noexcept override {
+        return framesInFlight_;
+    }
+
+    [[nodiscard]] std::size_t capacity_per_frame() const noexcept override {
+        return capacityPerFrame_;
+    }
+
+private:
+    std::uint32_t          framesInFlight_;
+    std::size_t            capacityPerFrame_;
+    std::vector<std::byte> storage_;
+    NullBuffer             backingBuffer_;
+    std::uint32_t          currentFrame_ = 0;
+    std::size_t            frameOffset_  = 0;
 };
 
 class NullDevice final : public IDevice {
@@ -227,6 +287,17 @@ public:
 
     [[nodiscard]] std::unique_ptr<IFence> create_fence(const FenceDesc& desc) override {
         return std::make_unique<NullFence>(desc);
+    }
+
+    [[nodiscard]] core::Result<std::unique_ptr<IFrameUploadRing>>
+    create_upload_ring(std::uint32_t frames_in_flight,
+                       std::size_t   capacity_per_frame) override {
+        if (frames_in_flight == 0 || capacity_per_frame == 0) {
+            return Status::failure(StatusCode::invalid_argument,
+                                   "frames_in_flight and capacity must be non-zero");
+        }
+        return std::unique_ptr<IFrameUploadRing>(
+            std::make_unique<NullFrameUploadRing>(frames_in_flight, capacity_per_frame));
     }
 
 private:

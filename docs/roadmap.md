@@ -1,6 +1,6 @@
 # Roadmap
 
-## Phase 1: Foundation And Contracts
+## Phase 1: Foundation And Contracts — Complete
 
 - Establish modular CMake targets and public include layout.
 - Make current library layers installable and consumable through CMake package
@@ -11,23 +11,28 @@
   through the null backend.
 - Prove host-owned surface embedding with a structured workspace example.
 
-## Phase 2: Render Data Foundation
+## Phase 2: Render Data Foundation — In Progress
 
-- Define renderer-facing data interfaces beyond the current ECS extraction path.
-- Reserve bulk and GPU-oriented data-flow direction for dense dynamic datasets
-  before locking higher renderer APIs around per-entity extraction.
-- Grow frame graph and render pass orchestration from the current submission
-  baseline.
-- Add shader reflection and binding layout direction without binding the public
-  API to one GPU backend.
-- Expand render ECS adapters for cameras, lighting, meshes, and materials.
+- Define `RenderBatch` and `InstanceLayout` as the universal renderer input
+  contract, decoupling `truffle_render` from `truffle_ecs`.
+- Establish `IFrameUploadRing` as the N-buffered CPU-to-GPU upload primitive at
+  the RHI layer, supporting both ECS extraction and direct bulk upload.
+- Introduce `truffle_scene` as the optional ECS-to-render bridge module.
+- Reserve GPU transform hierarchy direction for Phase 3/4 compute pass work.
+- Define `IPipelineCache` interface for future shader variant management.
+- Expand ECS component definitions for cameras, lighting, meshes, and materials.
 
 ## Phase 3: Rendering Framework Layers
 
 - Add higher rendering layers for materials, asset-facing boundaries, debug
   hooks, and tool-facing orchestration without hiding low-level modules.
+- Implement GPU transform hierarchy compute pass for large node graphs.
 - Keep scene adapters optional so consumers can choose Truffle ECS or their own
   data source.
+- Grow frame graph and render pass orchestration from the current submission
+  baseline.
+- Add shader reflection and binding layout direction without binding the public
+  API to one GPU backend.
 
 ## Phase 4: Production Backends
 

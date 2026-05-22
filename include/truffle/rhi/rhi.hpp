@@ -166,11 +166,43 @@ public:
     [[nodiscard]] virtual bool signaled() const noexcept = 0;
 };
 
+// ---------------------------------------------------------------------------
+// Frame upload ring — N-buffered CPU-writable GPU-visible upload memory
+// ---------------------------------------------------------------------------
+
+struct FrameAllocation {
+    IBuffer*    buffer    = nullptr; // backing buffer; nullptr signals exhaustion
+    std::size_t offset    = 0;
+    void*       mappedPtr = nullptr; // CPU-writable pointer into the buffer
+    std::size_t size      = 0;
+
+    [[nodiscard]] bool valid() const noexcept { return buffer != nullptr; }
+};
+
+class IFrameUploadRing {
+public:
+    virtual ~IFrameUploadRing() = default;
+
+    // Allocate size bytes aligned to alignment from the current frame's range.
+    // Returns an invalid FrameAllocation (buffer == nullptr) if the ring is full.
+    [[nodiscard]] virtual FrameAllocation allocate(
+        std::size_t size, std::size_t alignment = 16) = 0;
+
+    // Advance to the next frame slot, reclaiming the oldest completed frame.
+    // Call once per frame after verifying prior GPU work is complete.
+    virtual void advance() = 0;
+
+    [[nodiscard]] virtual std::uint32_t frames_in_flight() const noexcept = 0;
+    [[nodiscard]] virtual std::size_t   capacity_per_frame() const noexcept = 0;
+};
+
 class ICommandBuffer {
 public:
     virtual ~ICommandBuffer() = default;
     [[nodiscard]] virtual core::Status begin() = 0;
     [[nodiscard]] virtual core::Status draw(std::uint32_t vertex_count) = 0;
+    [[nodiscard]] virtual core::Status draw_instanced(
+        std::uint32_t vertex_count, std::uint32_t instance_count) = 0;
     [[nodiscard]] virtual core::Status end() = 0;
     [[nodiscard]] virtual bool ready_for_submit() const noexcept = 0;
 };
@@ -205,6 +237,9 @@ public:
     create_swapchain(ISurface& surface, const SwapchainDesc& desc) = 0;
     [[nodiscard]] virtual std::unique_ptr<ICommandBuffer> create_command_buffer() = 0;
     [[nodiscard]] virtual std::unique_ptr<IFence> create_fence(const FenceDesc& desc) = 0;
+    [[nodiscard]] virtual core::Result<std::unique_ptr<IFrameUploadRing>>
+    create_upload_ring(std::uint32_t frames_in_flight,
+                       std::size_t   capacity_per_frame) = 0;
 };
 
 class IBackend {

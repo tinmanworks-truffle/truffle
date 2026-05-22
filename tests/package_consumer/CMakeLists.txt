@@ -12,4 +12,5 @@ target_link_libraries(
         Truffle::ECS
         Truffle::RHI
         Truffle::BackendNull
-        Truffle::Render)
+        Truffle::Render
+        Truffle::Scene)

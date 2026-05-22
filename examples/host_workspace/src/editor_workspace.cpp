@@ -78,7 +78,7 @@ public:
     }
 
     [[nodiscard]] FrameShape expected_frame_shape() const noexcept override {
-        return FrameShape{1, 1, 3};
+        return FrameShape{1, 1, 1};
     }
 };
 
