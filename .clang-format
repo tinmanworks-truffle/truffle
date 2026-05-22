@@ -1,0 +1,5 @@
+BasedOnStyle: LLVM
+AccessModifierOffset: -2
+ColumnLimit: 90
+IndentWidth: 2
+SortIncludes: CaseSensitive

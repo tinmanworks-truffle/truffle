@@ -1,0 +1,20 @@
+if(NOT DEFINED TRUFFLE_BINARY_DIR OR
+   NOT DEFINED TRUFFLE_SOURCE_DIR OR
+   NOT DEFINED TRUFFLE_INSTALL_PREFIX OR
+   NOT DEFINED TRUFFLE_CONSUMER_BUILD_DIR)
+    message(FATAL_ERROR "Truffle install verification requires build and source paths.")
+endif()
+
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" --install "${TRUFFLE_BINARY_DIR}"
+        --prefix "${TRUFFLE_INSTALL_PREFIX}"
+    COMMAND_ERROR_IS_FATAL ANY)
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+        -S "${TRUFFLE_SOURCE_DIR}/tests/package_consumer"
+        -B "${TRUFFLE_CONSUMER_BUILD_DIR}"
+        "-DCMAKE_PREFIX_PATH=${TRUFFLE_INSTALL_PREFIX}"
+    COMMAND_ERROR_IS_FATAL ANY)
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" --build "${TRUFFLE_CONSUMER_BUILD_DIR}"
+    COMMAND_ERROR_IS_FATAL ANY)

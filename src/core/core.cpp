@@ -4,5 +4,7 @@
 
 namespace truffle::core {
 // The core target gives shared public contracts a stable link boundary.
+namespace detail {
+void link_anchor() noexcept {}
 }
-
+}
