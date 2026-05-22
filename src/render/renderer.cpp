@@ -72,6 +72,11 @@ core::Status Renderer::render(std::span<const RenderBatch> batches,
     if (const auto s = cmd->end_render_pass(); !s.ok()) {
         return s;
     }
+    if (swapchain) {
+        if (const auto s = swapchain->schedule_present(*cmd); !s.ok()) {
+            return s;
+        }
+    }
     if (const auto s = cmd->end(); !s.ok()) {
         return s;
     }

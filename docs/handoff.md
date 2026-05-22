@@ -13,36 +13,37 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Truffle is in Phase 3A: RHI Contract Enrichment. The render-pass model, resource
-binding, and shader-stage contracts have been landed on branch
-`feat/phase3-rhi-contracts`. Phase 3B (Metal backend) is next.
+Truffle is in Phase 3B: Metal backend. A fully functional Metal backend is on
+branch `feat/phase3-metal-backend`, pending PR to `develop`. Phase 3C
+(Material system) is next.
 
 ## Current Work Status
 
-- Phase 3A complete on `feat/phase3-rhi-contracts`. 10/10 tests pass; CI preset
-  warnings-as-errors clean.
-- `include/truffle/rhi/rhi.hpp` enriched:
-  - `ShaderStage`, `PrimitiveTopology`, `LoadOp`, `StoreOp` enums.
-  - `ShaderDesc` carries a `stage` field.
-  - `PipelineDesc` carries `vertexShader`, `fragmentShader`, `topology`,
-    `depthWrite` alongside the existing `depthTest` and `debugName`.
-  - `RenderPassDesc`, `ColorAttachmentDesc`, `DepthAttachmentDesc`, `ClearColor`
-    structs define inline render pass configuration.
-  - `ISwapchain::acquire_next_texture()` returns the current frame drawable.
-  - `ICommandBuffer` expanded: `begin_render_pass`, `end_render_pass`,
-    `bind_pipeline`, `bind_vertex_buffer`, `bind_index_buffer`, `set_viewport`,
-    `set_scissor`; draw methods rearranged into logical sections.
-- `NullSwapchain::acquire_next_texture()` lazily allocates a `NullTexture`
-  drawable and returns it each frame.
-- `NullCommandBuffer` has stub implementations for all new methods; each
-  guards on `State::recording`.
-- `Renderer::render()` now takes an optional `rhi::ISwapchain*` (default
-  `nullptr`). When supplied it acquires the next texture and builds a proper
-  `RenderPassDesc`; headless path uses a `{1,1}` placeholder extent.
-  The render loop calls `bind_pipeline`, `bind_vertex_buffer`, `begin/end_render_pass`.
-- Tests updated: `rhi_null_tests` exercises full enriched command sequence;
-  `render_flow_tests` covers both headless and swapchain render paths.
-- ADR 0007 records the inline render-pass model decision.
+- Phase 3A + 3B complete on `feat/phase3-metal-backend`. 11/11 tests pass; CI
+  preset warnings-as-errors clean.
+- `include/truffle/rhi/rhi.hpp`: added `ISwapchain::schedule_present(ICommandBuffer&)`
+  to let swapchain implementations hook presentation into the command buffer
+  before commit. `ICommandBuffer` forward-declared to avoid circular ordering.
+- `include/truffle/rhi/metal_backend.hpp` + `src/backends/metal/metal_backend.mm`:
+  full Metal backend implementation:
+  - `MetalBuffer`: `MTLResourceStorageModeShared` (CPU+GPU visible, Phase 3B).
+  - `MetalTexture`: `MTLStorageModePrivate` + `RenderTarget|ShaderRead` usage.
+  - `MetalSampler`, `MetalShader` (MSL source compiled via
+    `newLibraryWithSource:options:error:`), `MetalPipeline`
+    (`MTLRenderPipelineState`, BGRA8Unorm colour attachment, Phase 3B).
+  - `MetalSurface` (wraps `CAMetalLayer*` from `cocoa_layer` native handle);
+    `MetalSwapchain` (headless offscreen or CAMetalLayer-backed).
+  - `MetalCommandBuffer`: full render pass + resource binding + draw calls via
+    `id<MTLRenderCommandEncoder>`.
+  - `MetalQueue::submit`: calls `[cmdBuf commit]`; blocking
+    `waitUntilCompleted` when a fence is requested (Phase 3B; async in 3C).
+  - `MetalFrameUploadRing`: N `MTLResourceStorageModeShared` buffers.
+  - `MetalDevice`, `MetalBackend` (`MTLCreateSystemDefaultDevice`).
+- `cmake/TruffleOptions.cmake`: Metal option defaults ON for Apple top-level builds.
+- `src/backends/CMakeLists.txt`: Metal backend wired in (Apple-only guard).
+- `tests/metal_backend_tests.cpp`: exercises buffer, shader compile, pipeline,
+  headless swapchain, full render pass, upload ring, fence, resize.
+  Skips gracefully when no Metal GPU is present.
 
 ## Relevant Decisions And Constraints
 
@@ -79,29 +80,32 @@ binding, and shader-stage contracts have been landed on branch
 
 ## Last Verified Commands And Checks
 
-Verified on 2025-05-22 (Phase 3A):
+Verified on 2025-05-22 (Phase 3B):
 
 ```sh
+cmake --preset dev  -DTRUFFLE_BUILD_BACKEND_METAL=ON
 cmake --build --preset dev
-ctest --preset dev
+ctest --preset dev   # 11/11
+cmake --preset ci   -DTRUFFLE_BUILD_BACKEND_METAL=ON
 cmake --build --preset ci
-ctest --preset ci
+ctest --preset ci    # 11/11
 ```
 
-10 tests pass (dev + ci). CI preset warnings-as-errors clean.
-All new ICommandBuffer stubs, swapchain acquire, and render-pass flow exercised.
+11 tests: 3 host workspace smoke, ECS, null RHI, render flow, render batch,
+frame ring, scene adapter, Metal backend, package consumer.
 
 ## Next Resume Steps
 
 1. Read `AGENTS.md`, the README, contributor guidance, and architecture docs.
-2. Check current branch (`feat/phase3-rhi-contracts`) and open PR state.
-3. Open a PR from `feat/phase3-rhi-contracts` → `develop`, get review.
-4. Phase 3B: Metal backend in `src/backends/metal/`.
-   - `NullBackend` as structural guide; implement `MetalDevice`, `MetalCommandBuffer`,
-     `MetalSwapchain`, `MTLRenderPassDescriptor` mapping from `RenderPassDesc`.
-   - Add `TRUFFLE_BACKEND_METAL` CMake option.
-5. Phase 3C: Material system — uniform upload path, `IShader` bytecode loading,
-   real `IPipelineCache` with layout+material hash keying.
+2. Check current branch (`feat/phase3-metal-backend`) and open PR state.
+3. Open a PR from `feat/phase3-metal-backend` → `develop`, get review.
+4. Phase 3C: Material system.
+   - Add `colorFormat` field to `PipelineDesc` (remove the BGRA8Unorm hardcode).
+   - Real `IPipelineCache` keyed on `InstanceLayout::hash()` + material.
+   - Uniform buffer upload path via `IFrameUploadRing`.
+   - `IShader` bytecode loading utility (file or embedded bytes).
+5. Phase 3D: Async fence (replace blocking `waitUntilCompleted` with
+   `dispatch_semaphore` completion handler in Metal backend).
 6. Update this handoff before stopping on another machine.
 
 ## Open Questions Or Risks

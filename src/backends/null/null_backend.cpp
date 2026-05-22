@@ -78,6 +78,10 @@ public:
         return drawable_.get();
     }
 
+    [[nodiscard]] Status schedule_present(ICommandBuffer& /*cmd*/) override {
+        return Status::success();
+    }
+
 private:
     SwapchainDesc                desc_;
     std::unique_ptr<NullTexture> drawable_;
