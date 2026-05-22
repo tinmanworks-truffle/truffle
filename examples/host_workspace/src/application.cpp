@@ -4,6 +4,7 @@
 
 #include "truffle/render/renderer.hpp"
 #include "truffle/rhi/null_backend.hpp"
+#include "truffle/scene/scene_adapter.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -21,9 +22,7 @@ namespace {
 
 using core::Status;
 using core::StatusCode;
-using render::ExtractedFrame;
 using render::Renderer;
-using render::SceneExtractor;
 using rhi::BufferDesc;
 using rhi::BufferUsage;
 using rhi::Extent2D;
@@ -53,10 +52,10 @@ constexpr Extent2D smokeResizeExtent{1280, 720};
     return 1;
 }
 
-[[nodiscard]] bool has_shape(const ExtractedFrame& frame, FrameShape shape) {
+[[nodiscard]] bool has_shape(const scene::SceneFrame& frame, FrameShape shape) {
     return frame.cameras.size() == shape.cameras &&
            frame.lights.size() == shape.lights &&
-           frame.renderItems.size() == shape.renderItems;
+           frame.meshBatches.size() == shape.meshBatches;
 }
 
 class WorkspaceSession {
@@ -139,6 +138,13 @@ public:
         workspace_->build_scene(world_);
         systems_ = workspace_->systems();
         renderer_ = std::make_unique<Renderer>(*device_);
+
+        auto ringResult = device_->create_upload_ring(2, 4 * 1024 * 1024);
+        if (!ringResult.ok()) {
+            return ringResult.status();
+        }
+        ring_ = std::move(ringResult).value();
+
         extent_ = extent;
         return Status::success();
     }
@@ -157,12 +163,12 @@ public:
         }
 
         world_.run(systems_, deltaSeconds);
-        const auto frame = extractor_.extract(world_);
+        const auto frame = adapter_.extract(world_, *ring_);
         if (!has_shape(frame, shape_)) {
             return Status::failure(StatusCode::invalid_state,
                                    "workspace extracted frame shape changed");
         }
-        if (const auto renderStatus = renderer_->render(frame);
+        if (const auto renderStatus = renderer_->render(frame.meshBatches);
             !renderStatus.ok()) {
             return renderStatus;
         }
@@ -173,7 +179,7 @@ public:
     [[nodiscard]] Status validate_stats() const {
         const auto stats = backend_->stats();
         const auto expectedDraws =
-            static_cast<std::uint64_t>(renderedFrames_) * shape_.renderItems;
+            static_cast<std::uint64_t>(renderedFrames_) * shape_.meshBatches;
         if (stats.buffersCreated != 1 || stats.texturesCreated != 1 ||
             stats.surfacesCreated != 1 || stats.swapchainsCreated != 1 ||
             stats.commandBuffersCreated != renderedFrames_ ||
@@ -206,7 +212,8 @@ private:
     std::unique_ptr<rhi::ISwapchain> swapchain_;
     ecs::World world_;
     std::vector<ecs::World::System> systems_;
-    SceneExtractor extractor_;
+    scene::SceneAdapter adapter_;
+    std::unique_ptr<rhi::IFrameUploadRing> ring_;
     std::unique_ptr<Renderer> renderer_;
     Extent2D extent_;
     std::uint32_t renderedFrames_ = 0;
