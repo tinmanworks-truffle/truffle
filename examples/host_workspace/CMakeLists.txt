@@ -26,6 +26,10 @@ set(_host_workspace_libs glfw truffle_backend_null truffle_scene truffle_render)
 if(APPLE AND TRUFFLE_BUILD_BACKEND_METAL)
     list(APPEND _host_workspace_libs truffle_backend_metal)
 endif()
+if(TRUFFLE_BUILD_BACKEND_VULKAN)
+    list(APPEND _host_workspace_libs truffle_backend_vulkan)
+    target_compile_definitions(truffle_host_workspace_example PRIVATE TRUFFLE_BUILD_BACKEND_VULKAN=1)
+endif()
 
 target_link_libraries(truffle_host_workspace_example PRIVATE ${_host_workspace_libs})
 

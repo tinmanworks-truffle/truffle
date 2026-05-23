@@ -13,11 +13,26 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Indexed draw (Phase 3F) implemented and committed on `feat/indexed-draw`, pending
-PR merge to `develop`. After merge, next planned work is Phase 4 (shader variant
-pipeline, GPU-resident batch path, or additional backend targets).
+Phase 4 infrastructure updates for pooling and indirect draw execution (4A and 4B), Shader Pipeline Variants (4C), and Vulkan Stub backend (4D) are implemented on `feat/phase4-pool-indirect` and are ready for PR to `develop`.
 
 ## Current Work Status
+
+- **Phase 4A/4B — Pooling and Indirect Draw** (Implemented, pending PR):
+  - Refactored `IDevice` RHI abstractions to use custom deleterious `std::unique_ptr`s for Memory Pooling.
+  - Added object pools in `NullDevice` and `MetalDevice`.
+  - Added `BufferUsage::indirect`.
+  - Added `draw_indirect` and `draw_indexed_indirect` methods to `ICommandBuffer`.
+
+- **Phase 4C — Shader Variant Pipeline Cache** (Implemented, pending PR):
+  - Added `variantHash` in `RenderBatch`.
+  - `PipelineCache::CacheKey` utilizes this variant hash.
+  - Added `IPipelineCache::invalidate()`.
+
+- **Phase 4D — Vulkan Stub Backend** (Implemented, pending PR):
+  - Added CMake `-DTRUFFLE_BUILD_BACKEND_VULKAN=ON` flow.
+  - `IQueue` and `IDevice` mock classes mapped safely into `vulkan_backend.cpp`.
+  - Test verified with `truffle_host_workspace_example --vulkan`.
+
 
 - **Phase 3C — Material system** (merged, PR #9):
   - `PipelineDesc::colorFormat` — pipelines no longer hardcode BGRA8Unorm.
@@ -106,11 +121,7 @@ package consumer.
 
 1. Read `AGENTS.md`, README, contributor guidance, and architecture docs.
 2. Confirm `feat/indexed-draw` PR is merged; verify `develop` has Phase 3F.
-3. Phase 4 candidates:
-   - Shader variant pipeline (hot-reload, permutation keys).
-   - GPU-resident batch path (indirect draw with GPU-side buffer management).
-   - Additional backend target (Vulkan stub or Null-backend validation layer).
-   - Performance: remove allocations in hot render loop (arena/pool allocators).
+3. Prepare for Phase 5 tasks.
 4. Update this handoff before stopping on another machine.
 
 ## Open Questions Or Risks
