@@ -104,6 +104,7 @@ struct RenderBatch {
     BufferView     bindings[kMaxBindings]{};
     DrawKind       kind        = DrawKind::Direct;
     MaterialId     material    = 0;
+    std::size_t    variantHash = 0; // shader macro variant mutation key
     rhi::IndexFormat indexFormat = rhi::IndexFormat::uint32; // for DrawKind::Indexed
 
     // Optional: index buffer for DrawKind::Indexed

@@ -12,7 +12,8 @@ namespace truffle::render {
 NullPipelineCache::NullPipelineCache(rhi::IDevice& device) : device_(&device) {}
 
 rhi::IPipeline* NullPipelineCache::get_or_create(const InstanceLayout& /*layout*/,
-                                                  MaterialId /*material*/) {
+                                              MaterialId /*material*/,
+                                              std::size_t /*variantHash*/) {
     if (!pipeline_) {
         auto result = device_->create_pipeline({.debugName = "null_pipeline"});
         if (result.ok()) {
@@ -34,8 +35,9 @@ void PipelineCache::register_shaders(MaterialId material, const ShaderBinding& s
 }
 
 rhi::IPipeline* PipelineCache::get_or_create(const InstanceLayout& layout,
-                                              MaterialId material) {
-    const CacheKey key{layout.hash(), material};
+                                              MaterialId material,
+                                              std::size_t variantHash) {
+    const CacheKey key{layout.hash(), material, variantHash};
     if (auto it = pipelines_.find(key); it != pipelines_.end()) {
         return it->second.get();
     }
@@ -60,6 +62,20 @@ rhi::IPipeline* PipelineCache::get_or_create(const InstanceLayout& layout,
     auto& ptr = pipelines_[key];
     ptr = std::move(result).value();
     return ptr.get();
+}
+
+void PipelineCache::invalidate(MaterialId material) {
+    for (auto it = pipelines_.begin(); it != pipelines_.end(); ) {
+        if (it->first.material == material) {
+            it = pipelines_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void PipelineCache::invalidate_all() {
+    pipelines_.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +108,7 @@ core::Status Renderer::render(std::span<const RenderBatch> batches,
 
     for (const auto& batch : batches) {
         if (cache_) {
-            if (auto* pipeline = cache_->get_or_create(batch.layout, batch.material)) {
+            if (auto* pipeline = cache_->get_or_create(batch.layout, batch.material, batch.variantHash)) {
                 (void)cmd->bind_pipeline(*pipeline);
             }
         }

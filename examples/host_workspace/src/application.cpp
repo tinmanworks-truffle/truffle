@@ -11,6 +11,12 @@
 #include "truffle/rhi/metal_backend.hpp"
 #endif
 
+// We just unconditionally include it for testing, but typically CMake sets a flag.
+// Or we wrap it in a stub conditional. Actually we are compiling it unconditionally if Vulkan option is set.
+#ifdef TRUFFLE_BUILD_BACKEND_VULKAN
+#include "truffle/rhi/vulkan_backend.hpp"
+#endif
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -75,6 +81,7 @@ public:
                                    "session extent must be non-zero");
         }
 
+        // We just always create a null backend here since it expects NullBackendStats
         backend_ = rhi::create_null_backend();
         const auto adapters = backend_->enumerate_adapters();
         if (adapters.empty() || !adapters.front().capabilities.presentation) {
@@ -450,6 +457,21 @@ int run_application(const ApplicationOptions& options) {
         std::cerr << "workspace selection could not be created\n";
         return 1;
     }
+    
+    if (options.useVulkan) {
+#ifdef TRUFFLE_BUILD_BACKEND_VULKAN
+        auto vulkanBackend = rhi::create_vulkan_backend();
+        auto devResult = vulkanBackend->create_device({});
+        if (!devResult.ok()) {
+            std::cout << "successfully loaded vulkan stub: " << devResult.status().message << "\n";
+            return 0;
+        }
+#else
+        std::cerr << "Vulkan backend not compiled\n";
+        return 1;
+#endif
+    }
+    
 #ifdef __APPLE__
     if (options.useMetal && !options.smoke) {
         return run_interactive_metal(*workspace);

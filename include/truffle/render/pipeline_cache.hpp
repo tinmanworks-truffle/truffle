@@ -30,9 +30,15 @@ public:
     virtual void register_shaders(MaterialId material,
                                   const ShaderBinding& shaders) = 0;
 
-    // Returns a matching pipeline or creates one. Returns nullptr on failure.
+    // Returns a matching pipeline or creates one.
+    // variantHash can be used to bucket pipelines driven by shader variants.
     [[nodiscard]] virtual rhi::IPipeline* get_or_create(
-        const InstanceLayout& layout, MaterialId material) = 0;
+        const InstanceLayout& layout, MaterialId material,
+        std::size_t variantHash = 0) = 0;
+
+    // Invalidate caches to trigger hot-reloads
+    virtual void invalidate(MaterialId material) = 0;
+    virtual void invalidate_all() = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -48,7 +54,11 @@ public:
                           const ShaderBinding& /*shaders*/) override {}
 
     [[nodiscard]] rhi::IPipeline* get_or_create(
-        const InstanceLayout& layout, MaterialId material) override;
+        const InstanceLayout& layout, MaterialId material,
+        std::size_t variantHash = 0) override;
+
+    void invalidate(MaterialId /*material*/) override {}
+    void invalidate_all() override {}
 
 private:
     rhi::IDevice*                   device_   = nullptr;
@@ -70,19 +80,24 @@ public:
                           const ShaderBinding& shaders) override;
 
     [[nodiscard]] rhi::IPipeline* get_or_create(
-        const InstanceLayout& layout, MaterialId material) override;
+        const InstanceLayout& layout, MaterialId material,
+        std::size_t variantHash = 0) override;
+
+    void invalidate(MaterialId material) override;
+    void invalidate_all() override;
 
 private:
     struct CacheKey {
         std::size_t layoutHash;
         MaterialId  material;
+        std::size_t variantHash;
         bool operator==(const CacheKey& o) const noexcept {
-            return layoutHash == o.layoutHash && material == o.material;
+            return layoutHash == o.layoutHash && material == o.material && variantHash == o.variantHash;
         }
     };
     struct CacheKeyHash {
         std::size_t operator()(const CacheKey& k) const noexcept {
-            return k.layoutHash ^ (k.material * 0x9e3779b9u);
+            return k.layoutHash ^ (k.material * 0x9e3779b9u) ^ (k.variantHash * 0x01000193u);
         }
     };
 
