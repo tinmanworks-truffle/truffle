@@ -466,6 +466,8 @@ int run_application(const ApplicationOptions& options) {
             std::cout << "successfully loaded vulkan stub: " << devResult.status().message << "\n";
             return 0;
         }
+        std::cout << "successfully loaded vulkan stub (device created)\n";
+        return 0;
 #else
         std::cerr << "Vulkan backend not compiled\n";
         return 1;
