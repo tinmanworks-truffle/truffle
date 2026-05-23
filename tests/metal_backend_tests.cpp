@@ -199,6 +199,19 @@ int main() {
         truffle::rhi::IndexFormat::uint32).ok());
     TRUFFLE_CHECK(cmdIdx->draw_indexed(3).ok());
     TRUFFLE_CHECK(cmdIdx->draw_indexed_instanced(3, 2).ok());
+    
+    // --- Indirect draw ---
+    auto indirectBufResult = device->create_buffer({
+        .size      = 256,
+        .usage     = truffle::rhi::BufferUsage::indirect,
+        .debugName = "indirect_buffer",
+    });
+    TRUFFLE_CHECK(indirectBufResult.ok());
+    auto indirectBuf = std::move(indirectBufResult).value();
+    
+    TRUFFLE_CHECK(cmdIdx->draw_indirect(*indirectBuf, 0).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed_indirect(*indirectBuf, 0).ok());
+    
     TRUFFLE_CHECK(cmdIdx->end_render_pass().ok());
     TRUFFLE_CHECK(swapchain->schedule_present(*cmdIdx).ok());
     TRUFFLE_CHECK(cmdIdx->end().ok());

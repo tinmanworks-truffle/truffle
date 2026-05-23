@@ -87,6 +87,17 @@ int main() {
         truffle::rhi::IndexFormat::uint16).ok());
     TRUFFLE_CHECK(cmdIdx->draw_indexed(6).ok());
     TRUFFLE_CHECK(cmdIdx->draw_indexed_instanced(6, 2).ok());
+    
+    auto indirectBufResult = device->create_buffer({
+        .size = 16,
+        .usage = truffle::rhi::BufferUsage::indirect,
+        .debugName = "indirect",
+    });
+    TRUFFLE_CHECK(indirectBufResult.ok());
+    auto indirectBuf = std::move(indirectBufResult).value();
+    TRUFFLE_CHECK(cmdIdx->draw_indirect(*indirectBuf, 0).ok());
+    TRUFFLE_CHECK(cmdIdx->draw_indexed_indirect(*indirectBuf, 0).ok());
+    
     TRUFFLE_CHECK(cmdIdx->end_render_pass().ok());
     TRUFFLE_CHECK(cmdIdx->end().ok());
     TRUFFLE_CHECK(device->queue(truffle::rhi::QueueKind::graphics)
@@ -94,10 +105,10 @@ int main() {
                       .ok());
 
     const auto stats = backend->stats();
-    TRUFFLE_CHECK(stats.buffersCreated == 3); // original vb + new vb + ib
+    TRUFFLE_CHECK(stats.buffersCreated == 4); // original vb + new vb + ib + indirect
     TRUFFLE_CHECK(stats.surfacesCreated == 1);
     TRUFFLE_CHECK(stats.swapchainsCreated == 1);
-    TRUFFLE_CHECK(stats.drawsRecorded == 3); // draw + draw_indexed + draw_indexed_instanced
+    TRUFFLE_CHECK(stats.drawsRecorded == 5); // draw + draw_indexed + draw_indexed_instanced + draw_indirect + draw_indexed_indirect
     TRUFFLE_CHECK(stats.submissions == 2);
     return 0;
 }

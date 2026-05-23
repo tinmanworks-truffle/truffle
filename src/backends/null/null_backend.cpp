@@ -13,7 +13,7 @@ using core::StatusCode;
 struct SharedStats {
     NullBackendStats value;
 };
-
+class NullDevice;
 class NullBuffer final : public IBuffer {
 public:
     explicit NullBuffer(BufferDesc desc) : desc_(std::move(desc)) {}
@@ -95,6 +95,10 @@ public:
     void signal() noexcept { signaled_ = true; }
     void wait() noexcept override { /* already signaled synchronously before submit returns */ }
 
+    // Allows pooling logic to update initial state
+    void reset(bool is_signaled) { signaled_ = is_signaled; }
+
+    NullDevice* device_ = nullptr;
 private:
     bool signaled_ = false;
 };
@@ -103,6 +107,10 @@ class NullCommandBuffer final : public ICommandBuffer {
 public:
     explicit NullCommandBuffer(std::shared_ptr<SharedStats> stats)
         : stats_(std::move(stats)) {}
+
+    void reset() { state_ = State::initial; } // For pooling
+
+    NullDevice* device_ = nullptr;
 
     [[nodiscard]] Status begin() override {
         if (state_ != State::initial) {
@@ -221,7 +229,25 @@ public:
         ++stats_->value.drawsRecorded;
         return Status::success();
     }
+    [[nodiscard]] Status draw_indirect(IBuffer& /*indirect_buffer*/,
+                                        std::size_t /*offset*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indirect failed validation");
+        }
+        ++stats_->value.drawsRecorded;
+        return Status::success();
+    }
 
+    [[nodiscard]] Status draw_indexed_indirect(IBuffer& /*indirect_buffer*/,
+                                                std::size_t /*offset*/) override {
+        if (state_ != State::recording) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_indirect failed validation");
+        }
+        ++stats_->value.drawsRecorded;
+        return Status::success();
+    }
     [[nodiscard]] Status end() override {
         if (state_ != State::recording) {
             return Status::failure(StatusCode::invalid_state,
@@ -387,13 +413,40 @@ public:
         return std::unique_ptr<ISwapchain>(std::make_unique<NullSwapchain>(desc));
     }
 
-    [[nodiscard]] std::unique_ptr<ICommandBuffer> create_command_buffer() override {
-        ++stats_->value.commandBuffersCreated;
-        return std::make_unique<NullCommandBuffer>(stats_);
+    [[nodiscard]] CommandBufferPtr create_command_buffer() override {
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        NullCommandBuffer* cmd = nullptr;
+        if (!cmd_pool_.empty()) {
+            cmd = cmd_pool_.back();
+            cmd_pool_.pop_back();
+        } else {
+            ++stats_->value.commandBuffersCreated;
+            cmd = new NullCommandBuffer(stats_);
+            cmd->device_ = this; // need to add device_ to NullCommandBuffer
+        }
+        return CommandBufferPtr(cmd, [](ICommandBuffer* p) {
+            auto* obj = static_cast<NullCommandBuffer*>(p);
+            if (obj->device_) { obj->device_->recycle_command_buffer(obj); }
+            else { delete obj; }
+        });
     }
 
-    [[nodiscard]] std::unique_ptr<IFence> create_fence(const FenceDesc& desc) override {
-        return std::make_unique<NullFence>(desc);
+    [[nodiscard]] FencePtr create_fence(const FenceDesc& desc) override {
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        NullFence* f = nullptr;
+        if (!fence_pool_.empty()) {
+            f = fence_pool_.back();
+            fence_pool_.pop_back();
+            f->reset(desc.signaled);
+        } else {
+            f = new NullFence(desc);
+            f->device_ = this;
+        }
+        return FencePtr(f, [](IFence* p) {
+            auto* obj = static_cast<NullFence*>(p);
+            if (obj->device_) { obj->device_->recycle_fence(obj); }
+            else { delete obj; }
+        });
     }
 
     [[nodiscard]] core::Result<std::unique_ptr<IFrameUploadRing>>
@@ -407,10 +460,29 @@ public:
             std::make_unique<NullFrameUploadRing>(frames_in_flight, capacity_per_frame));
     }
 
+    void recycle_command_buffer(NullCommandBuffer* cmd) {
+        cmd->reset();
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        cmd_pool_.push_back(cmd);
+    }
+
+    void recycle_fence(NullFence* f) {
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        fence_pool_.push_back(f);
+    }
+
+    ~NullDevice() {
+        for (auto* c : cmd_pool_) { delete c; }
+        for (auto* f : fence_pool_) { delete f; }
+    }
+
 private:
     std::shared_ptr<SharedStats> stats_;
     Capabilities capabilities_{true, true, 2};
     NullQueue queue_;
+    std::mutex pool_mutex_;
+    std::vector<NullCommandBuffer*> cmd_pool_;
+    std::vector<NullFence*> fence_pool_;
 };
 
 class NullBackend final : public INullBackend {

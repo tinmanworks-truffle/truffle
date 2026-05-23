@@ -112,7 +112,24 @@ core::Status Renderer::render(std::span<const RenderBatch> batches,
                 batch.uniformBuffer.offset);
         }
 
-        if (batch.kind == DrawKind::Indexed && batch.indexBuffer.buffer) {
+        if (batch.kind == DrawKind::Indirect && batch.indirectBuffer.buffer) {
+            if (const auto s =
+                    cmd->draw_indirect(*batch.indirectBuffer.buffer,
+                                       batch.indirectBuffer.offset);
+                !s.ok()) {
+                return s;
+            }
+        } else if (batch.kind == DrawKind::IndirectIndexed && batch.indirectBuffer.buffer && batch.indexBuffer.buffer) {
+            (void)cmd->bind_index_buffer(*batch.indexBuffer.buffer,
+                                          batch.indexBuffer.offset,
+                                          batch.indexFormat);
+            if (const auto s =
+                    cmd->draw_indexed_indirect(*batch.indirectBuffer.buffer,
+                                               batch.indirectBuffer.offset);
+                !s.ok()) {
+                return s;
+            }
+        } else if (batch.kind == DrawKind::Indexed && batch.indexBuffer.buffer) {
             (void)cmd->bind_index_buffer(*batch.indexBuffer.buffer,
                                           batch.indexBuffer.offset,
                                           batch.indexFormat);

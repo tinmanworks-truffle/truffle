@@ -37,6 +37,7 @@ enum class BufferUsage {
     storage,
     transfer_source,
     transfer_destination,
+    indirect,
 };
 
 enum class IndexFormat {
@@ -308,6 +309,10 @@ public:
     [[nodiscard]] virtual core::Status draw_indexed_instanced(
         std::uint32_t index_count,
         std::uint32_t instance_count) = 0;
+    [[nodiscard]] virtual core::Status draw_indirect(
+        IBuffer& indirect_buffer, std::size_t offset) = 0;
+    [[nodiscard]] virtual core::Status draw_indexed_indirect(
+        IBuffer& indirect_buffer, std::size_t offset) = 0;
 };
 
 class IQueue {
@@ -338,8 +343,15 @@ public:
     create_surface(const SurfaceDesc& desc) = 0;
     [[nodiscard]] virtual core::Result<std::unique_ptr<ISwapchain>>
     create_swapchain(ISurface& surface, const SwapchainDesc& desc) = 0;
-    [[nodiscard]] virtual std::unique_ptr<ICommandBuffer> create_command_buffer() = 0;
-    [[nodiscard]] virtual std::unique_ptr<IFence> create_fence(const FenceDesc& desc) = 0;
+
+    using CommandBufferDeleter = void (*)(ICommandBuffer*);
+    using CommandBufferPtr = std::unique_ptr<ICommandBuffer, CommandBufferDeleter>;
+    [[nodiscard]] virtual CommandBufferPtr create_command_buffer() = 0;
+
+    using FenceDeleter = void (*)(IFence*);
+    using FencePtr = std::unique_ptr<IFence, FenceDeleter>;
+    [[nodiscard]] virtual FencePtr create_fence(const FenceDesc& desc) = 0;
+
     [[nodiscard]] virtual core::Result<std::unique_ptr<IFrameUploadRing>>
     create_upload_ring(std::uint32_t frames_in_flight,
                        std::size_t   capacity_per_frame) = 0;

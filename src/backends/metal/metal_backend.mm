@@ -71,6 +71,8 @@ static MTLIndexType to_mtl_index_type(IndexFormat fmt) noexcept {
 // Resources
 // ---------------------------------------------------------------------------
 
+class MetalDevice;
+
 class MetalBuffer final : public IBuffer {
 public:
     // Allocate a new MTLBuffer.
@@ -244,6 +246,8 @@ public:
         }];
     }
 
+    MetalDevice* device_ = nullptr;
+
 private:
     std::shared_ptr<std::atomic<bool>> signaled_;
     dispatch_semaphore_t sem_;
@@ -256,6 +260,18 @@ private:
 class MetalCommandBuffer final : public ICommandBuffer {
 public:
     explicit MetalCommandBuffer(id<MTLCommandQueue> queue) : queue_(queue) {}
+
+    void reset() {
+        state_ = State::initial;
+        cmdBuf_ = nil;
+        encoder_ = nil;
+        topology_ = PrimitiveTopology::triangle_list;
+        indexBuf_ = nil;
+        indexBufOffset_ = 0;
+        indexBufType_ = MTLIndexTypeUInt32;
+    }
+
+    MetalDevice* device_ = nullptr;
 
     Status begin() override {
         if (state_ != State::initial) {
@@ -431,6 +447,37 @@ public:
                             indexBuffer:indexBuf_
                       indexBufferOffset:indexBufOffset_
                           instanceCount:instance_count];
+        return Status::success();
+    }
+
+    Status draw_indirect(IBuffer& indirect_buffer, std::size_t offset) override {
+        if (!encoder_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indirect requires an active render pass");
+        }
+        id<MTLBuffer> mtlBuf = static_cast<MetalBuffer&>(indirect_buffer).native();
+        [encoder_ drawPrimitives:to_mtl_primitive(topology_)
+                 indirectBuffer:mtlBuf
+           indirectBufferOffset:offset];
+        return Status::success();
+    }
+
+    Status draw_indexed_indirect(IBuffer& indirect_buffer, std::size_t offset) override {
+        if (!encoder_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_indirect requires an active render pass");
+        }
+        if (!indexBuf_) {
+            return Status::failure(StatusCode::invalid_state,
+                                   "draw_indexed_indirect requires a bound index buffer");
+        }
+        id<MTLBuffer> mtlBuf = static_cast<MetalBuffer&>(indirect_buffer).native();
+        [encoder_ drawIndexedPrimitives:to_mtl_primitive(topology_)
+                              indexType:indexBufType_
+                            indexBuffer:indexBuf_
+                      indexBufferOffset:indexBufOffset_
+                         indirectBuffer:mtlBuf
+                   indirectBufferOffset:offset];
         return Status::success();
     }
 
@@ -723,12 +770,31 @@ public:
             std::make_unique<MetalSwapchain>(device_, ms, desc));
     }
 
-    std::unique_ptr<ICommandBuffer> create_command_buffer() override {
-        return std::make_unique<MetalCommandBuffer>(cmdQueue_);
+    CommandBufferPtr create_command_buffer() override {
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        MetalCommandBuffer* cmd = nullptr;
+        if (!cmd_pool_.empty()) {
+            cmd = cmd_pool_.back();
+            cmd_pool_.pop_back();
+        } else {
+            cmd = new MetalCommandBuffer(cmdQueue_);
+            cmd->device_ = this;
+        }
+        return CommandBufferPtr(cmd, [](ICommandBuffer* p) {
+            auto* obj = static_cast<MetalCommandBuffer*>(p);
+            if (obj->device_) { obj->device_->recycle_command_buffer(obj); }
+            else { delete obj; }
+        });
     }
 
-    std::unique_ptr<IFence> create_fence(const FenceDesc& desc) override {
-        return std::make_unique<MetalFence>(desc.signaled);
+    FencePtr create_fence(const FenceDesc& desc) override {
+        MetalFence* f = new MetalFence(desc.signaled);
+        f->device_ = this;
+        return FencePtr(f, [](IFence* p) {
+            auto* obj = static_cast<MetalFence*>(p);
+            if (obj->device_) { obj->device_->recycle_fence(obj); }
+            else { delete obj; }
+        });
     }
 
     Result<std::unique_ptr<IFrameUploadRing>>
@@ -742,11 +808,29 @@ public:
             device_, frames_in_flight, capacity_per_frame));
     }
 
+    void recycle_command_buffer(MetalCommandBuffer* cmd) {
+        cmd->reset();
+        std::lock_guard<std::mutex> lock(pool_mutex_);
+        cmd_pool_.push_back(cmd);
+    }
+
+    void recycle_fence(MetalFence* f) {
+        // Safe fence recycling requires tracking pending GPU handlers.
+        // For Phase 4A, we avoid polling the sync object and recreate it.
+        delete f;
+    }
+
+    ~MetalDevice() {
+        for (auto* c : cmd_pool_) { delete c; }
+    }
+
 private:
     id<MTLDevice>      device_;
     id<MTLCommandQueue> cmdQueue_;
     MetalQueue         queue_;
     Capabilities       caps_{.presentation = true, .validation = false, .maxFramesInFlight = 3};
+    std::mutex pool_mutex_;
+    std::vector<MetalCommandBuffer*> cmd_pool_;
 };
 
 // ---------------------------------------------------------------------------

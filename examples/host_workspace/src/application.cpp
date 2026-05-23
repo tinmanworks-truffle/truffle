@@ -188,7 +188,7 @@ public:
             static_cast<std::uint64_t>(renderedFrames_) * shape_.meshBatches;
         if (stats.buffersCreated != 1 || stats.texturesCreated != 1 ||
             stats.surfacesCreated != 1 || stats.swapchainsCreated != 1 ||
-            stats.commandBuffersCreated != renderedFrames_ ||
+            stats.commandBuffersCreated != 1 ||
             stats.drawsRecorded != expectedDraws ||
             stats.submissions != renderedFrames_) {
             return Status::failure(StatusCode::invalid_state,

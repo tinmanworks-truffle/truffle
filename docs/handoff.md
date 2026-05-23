@@ -13,11 +13,16 @@ docs, charter, or ADRs instead of leaving it only in this working document.
 
 ## Current Focus
 
-Indexed draw (Phase 3F) implemented and committed on `feat/indexed-draw`, pending
-PR merge to `develop`. After merge, next planned work is Phase 4 (shader variant
-pipeline, GPU-resident batch path, or additional backend targets).
+Phase 4 infrastructure updates for pooling and indirect draw execution (4A and 4B) are implemented on `feat/phase4-pool-indirect` and are ready for PR to `develop`.
 
 ## Current Work Status
+
+- **Phase 4A/4B — Pooling and Indirect Draw** (Implemented, pending PR):
+  - Refactored `IDevice` RHI abstractions to use custom deleterious `std::unique_ptr`s for Memory Pooling logic. `CommandBufferPtr` and `FencePtr` introduced.
+  - Added object pools in `NullDevice` and `MetalDevice`.
+  - Expanded `DrawKind` enum and added `BufferUsage::indirect`.
+  - Added `draw_indirect` and `draw_indexed_indirect` methods to `ICommandBuffer` interface and implemented them in `NullBackend` and `MetalBackend`.
+  - Evaluated and solved regression in `host_workspace` tests related to strictly assuming resource allocations.
 
 - **Phase 3C — Material system** (merged, PR #9):
   - `PipelineDesc::colorFormat` — pipelines no longer hardcode BGRA8Unorm.
